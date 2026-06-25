@@ -4,6 +4,8 @@ import { describe, it, expect } from "vitest";
 import { getCapabilitiesForModel } from "../../open-sse/providers/capabilities.js";
 import { stripUnsupportedParams } from "../../open-sse/translator/concerns/paramSupport.js";
 import { normalizeClaudePassthrough } from "../../open-sse/translator/formats/claude.js";
+import { BaseExecutor } from "../../open-sse/executors/base.js";
+import { PROVIDERS } from "../../open-sse/providers/index.js";
 
 describe("Opus 4.8 capabilities (cc dash + gh dot ids)", () => {
   for (const [provider, model] of [
@@ -65,5 +67,18 @@ describe("Claude Code passthrough folds provider-effort override into output_con
     const out = fold("claude-opus-4-8", { reasoning_effort: "low", output_config: { effort: "xhigh" } });
     expect(out.output_config.effort).toBe("xhigh");
     expect(out.reasoning_effort).toBeUndefined();
+  });
+});
+
+describe("Per-model 1M context opt-in appends context-1m beta header", () => {
+  const ex = new BaseExecutor("claude", PROVIDERS.claude);
+  const beta = (h) => Object.entries(h).find(([k]) => k.toLowerCase() === "anthropic-beta")?.[1] || "";
+
+  it("appends context-1m-2025-08-07 when credentials.context1m is set", () => {
+    expect(beta(ex.buildHeaders({ accessToken: "sk-ant-oat-x", context1m: true }))).toContain("context-1m-2025-08-07");
+  });
+
+  it("leaves the beta header untouched when context1m is off", () => {
+    expect(beta(ex.buildHeaders({ accessToken: "sk-ant-oat-x", context1m: false }))).not.toContain("context-1m-2025-08-07");
   });
 });

@@ -9,7 +9,7 @@ function fmtTokens(n) {
   return String(n);
 }
 
-export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps }) {
+export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps, effort, onEffortChange, context, onContextChange, showContext }) {
   const borderColor = testStatus === "ok"
     ? "border-green-500/40"
     : testStatus === "error"
@@ -21,6 +21,14 @@ export default function ModelRow({ model, fullModel, alias, copied, onCopy, test
     : testStatus === "error"
     ? "#ef4444"
     : undefined;
+
+  // Effort selector: only for reasoning models; offer xhigh/max only when the model supports them.
+  const showEffort = !!caps?.reasoning && typeof onEffortChange === "function";
+  const ceil = caps?.maxEffort || "high";
+  const effortOpts = ["auto", "none", "low", "medium", "high",
+    ...(ceil === "xhigh" || ceil === "max" ? ["xhigh"] : []),
+    ...(ceil === "max" ? ["max"] : [])];
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <div className={`group min-w-0 max-w-full rounded-lg border px-3 py-2 ${borderColor} hover:bg-sidebar/50`}>
@@ -101,6 +109,34 @@ export default function ModelRow({ model, fullModel, alias, copied, onCopy, test
           </button>
         ) : null}
       </div>
+      {(showEffort || (showContext && typeof onContextChange === "function")) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-7">
+          {showEffort && (
+            <select
+              value={effort || "auto"}
+              onChange={(e) => onEffortChange(e.target.value)}
+              title="Reasoning effort for this model"
+              className="rounded border border-border bg-background px-1 py-0.5 text-[10px] text-text-muted focus:border-primary focus:outline-none"
+            >
+              {effortOpts.map((o) => (
+                <option key={o} value={o}>{o === "auto" ? "Effort: Auto" : `Effort: ${cap(o)}`}</option>
+              ))}
+            </select>
+          )}
+          {showContext && typeof onContextChange === "function" && (
+            <select
+              value={context || "auto"}
+              onChange={(e) => onContextChange(e.target.value)}
+              title="Context window — 1M sends Anthropic's context-1m beta header"
+              className="rounded border border-border bg-background px-1 py-0.5 text-[10px] text-text-muted focus:border-primary focus:outline-none"
+            >
+              <option value="auto">Ctx: Auto</option>
+              <option value="200k">Ctx: 200K</option>
+              <option value="1m">Ctx: 1M</option>
+            </select>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -121,4 +157,9 @@ ModelRow.propTypes = {
   isTesting: PropTypes.bool,
   onDisable: PropTypes.func,
   caps: PropTypes.object,
+  effort: PropTypes.string,
+  onEffortChange: PropTypes.func,
+  context: PropTypes.string,
+  onContextChange: PropTypes.func,
+  showContext: PropTypes.bool,
 };

@@ -71,6 +71,19 @@ export class BaseExecutor {
       headers["Accept"] = "text/event-stream";
     }
 
+    // Per-model 1M context opt-in: append Anthropic's context-1m beta. Appends to an
+    // existing Anthropic-Beta header (claude) or sets it for anthropic-compatible
+    // providers; no-op for everything else.
+    if (credentials?.context1m) {
+      const CTX_1M = "context-1m-2025-08-07";
+      const betaKey = Object.keys(headers).find((k) => k.toLowerCase() === "anthropic-beta");
+      if (betaKey) {
+        if (!headers[betaKey].includes(CTX_1M)) headers[betaKey] = `${headers[betaKey]},${CTX_1M}`;
+      } else if (this.provider === "claude" || this.provider?.startsWith?.("anthropic-compatible-")) {
+        headers["anthropic-beta"] = CTX_1M;
+      }
+    }
+
     return headers;
   }
 

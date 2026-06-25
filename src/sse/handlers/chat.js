@@ -240,7 +240,11 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
 
     // Use shared chatCore
     const chatSettings = await getSettings();
-    const providerThinking = (chatSettings.providerThinking || {})[provider] || null;
+    const provThinking = (chatSettings.providerThinking || {})[provider] || null;
+    // Per-model overrides (effort + 1M context opt-in), keyed by "<provider>/<model>".
+    const modelCfg = (chatSettings.modelSettings || {})[`${provider}/${model}`] || {};
+    const providerThinking = modelCfg.effort && modelCfg.effort !== "auto" ? { mode: modelCfg.effort } : provThinking;
+    const modelContext1m = modelCfg.context === "1m";
     const result = await handleChatCore({
       body: { ...body, model: `${provider}/${model}` },
       modelInfo: { provider, model },
@@ -260,6 +264,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       ponytailEnabled: !!chatSettings.ponytailEnabled,
       ponytailLevel: chatSettings.ponytailLevel || "full",
       providerThinking,
+      modelContext1m,
       // Detect source format by endpoint + body
       sourceFormatOverride: request?.url ? detectFormatByEndpoint(new URL(request.url).pathname, body) : null,
       onCredentialsRefreshed: async (newCreds) => {

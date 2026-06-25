@@ -73,6 +73,8 @@ export default function ProviderDetailPage() {
   const stopOneByOneRef = useRef(false);
   const [importingQoderModels, setImportingQoderModels] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
+  // Per-model settings keyed by "<providerId>/<modelId>" → { effort, context }
+  const [modelSettings, setModelSettings] = useState({});
   const { copied, copy } = useCopyToClipboard();
 
   const AG_RISK_STORAGE_KEY = "ag_risk_confirmed";
@@ -275,6 +277,8 @@ export default function ProviderDetailPage() {
       // Load per-provider thinking config
       const thinkingCfg = (settingsData.providerThinking || {})[providerId] || {};
       setThinkingMode(thinkingCfg.mode || "auto");
+      // Load per-model settings (effort + 1M context opt-in), keyed by "<providerId>/<modelId>"
+      setModelSettings(settingsData.modelSettings || {});
       const apCfg = settingsData.claudeAutoPing || {};
       setAutoPing({ enabled: apCfg.enabled === true, connections: apCfg.connections || {} });
       if (nodesRes.ok) {
@@ -381,6 +385,28 @@ export default function ProviderDetailPage() {
       });
     } catch (error) {
       console.log("Error saving thinking config:", error);
+    }
+  };
+
+  // Persist a per-model setting (effort / context). key = "<providerId>/<modelId>".
+  // Drops fields set back to their default ("auto") and prunes empty entries.
+  const saveModelSetting = async (modelId, patch) => {
+    const key = `${providerId}/${modelId}`;
+    const next = { ...modelSettings };
+    const entry = { ...(next[key] || {}), ...patch };
+    if (!entry.effort || entry.effort === "auto") delete entry.effort;
+    if (!entry.context || entry.context === "auto") delete entry.context;
+    if (Object.keys(entry).length === 0) delete next[key];
+    else next[key] = entry;
+    setModelSettings(next);
+    try {
+      await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelSettings: next }),
+      });
+    } catch (error) {
+      console.log("Error saving model setting:", error);
     }
   };
 
@@ -1083,6 +1109,11 @@ export default function ProviderDetailPage() {
             isCustom
             isFree={false}
             caps={getCaps(`${providerId}/${model.id}`)}
+            effort={modelSettings[`${providerId}/${model.id}`]?.effort || "auto"}
+            onEffortChange={(v) => saveModelSetting(model.id, { effort: v })}
+            context={modelSettings[`${providerId}/${model.id}`]?.context || "auto"}
+            onContextChange={(v) => saveModelSetting(model.id, { context: v })}
+            showContext={providerId === "claude" || isAnthropicCompatibleProvider(providerId)}
           />
         ))}
 
@@ -1108,6 +1139,11 @@ export default function ProviderDetailPage() {
               isFree={model.isFree}
               onDisable={() => handleDisableModel(model.id)}
               caps={getCaps(`${providerId}/${model.id}`)}
+              effort={modelSettings[`${providerId}/${model.id}`]?.effort || "auto"}
+              onEffortChange={(v) => saveModelSetting(model.id, { effort: v })}
+              context={modelSettings[`${providerId}/${model.id}`]?.context || "auto"}
+              onContextChange={(v) => saveModelSetting(model.id, { context: v })}
+              showContext={providerId === "claude" || isAnthropicCompatibleProvider(providerId)}
             />
           );
         })}

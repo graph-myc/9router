@@ -12,6 +12,12 @@ license = "MIT"
 authors = ["graph-myc"]
 description = "9Router — agentic orchestrator (Aggregator), Rust rewrite"
 
+# Disable debuginfo in dev builds: the host MSVC linker (VS2017) throws
+# LNK1318 (PDB FILE_SYSTEM error) when linking proc-macro dylibs (e.g. leptos_macro).
+# No PDB → no PDB error. Backend debugging can re-enable per-build if needed.
+[profile.dev]
+debug = false
+
 [workspace.dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 serde = { version = "1", features = ["derive"] }

@@ -1176,30 +1176,6 @@ export default function ProviderDetailPage() {
           );
         })}
 
-        {/* Add model button — inline, same style as model chips */}
-        <button
-          onClick={() => setShowAddCustomModel(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs text-primary transition-colors hover:border-primary hover:bg-primary/5 sm:w-auto"
-        >
-          <span className="material-symbols-outlined text-sm">add</span>
-          Add Model
-        </button>
-
-        {/* Fetch live model list from the provider's API (Claude Code, Copilot, Codex, …) */}
-        {connections.length > 0 && providerId !== "qoder" && (
-          <button
-            onClick={handleFetchProviderModels}
-            disabled={fetchingModels}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-500/40 px-3 py-2 text-xs text-blue-600 dark:text-blue-400 transition-colors hover:border-blue-500 hover:bg-blue-500/5 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-            title={translate("Fetch the full model list from this provider's API")}
-          >
-            <span className="material-symbols-outlined text-sm" style={fetchingModels ? { animation: "spin 1s linear infinite" } : undefined}>
-              {fetchingModels ? "progress_activity" : "cloud_download"}
-            </span>
-            {fetchingModels ? translate("Fetching...") : translate("Fetch Models")}
-          </button>
-        )}
-
         {/* Import Qoder models button — only show for qoder provider */}
         {providerId === "qoder" && connections.some((conn) => conn.isActive !== false) && (
           <button
@@ -1664,7 +1640,15 @@ export default function ProviderDetailPage() {
             ].filter((m) => { const k = getModelKind(m); return !k || k === "llm"; }).map((m) => m.id);
             const activeIds = allIds.filter((id) => !disabledModelIds.includes(id));
             return (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" icon="add" onClick={() => setShowAddCustomModel(true)}>
+                  Add Model
+                </Button>
+                {connections.length > 0 && providerId !== "qoder" && (
+                  <Button size="sm" variant="secondary" icon="cloud_download" onClick={handleFetchProviderModels} loading={fetchingModels} disabled={fetchingModels}>
+                    {fetchingModels ? "Fetching..." : "Fetch Models"}
+                  </Button>
+                )}
                 {disabledModelIds.length > 0 && (
                   <Button size="sm" variant="secondary" icon="restart_alt" onClick={handleEnableAll}>
                     Active All

@@ -73,6 +73,7 @@ export default function ProviderDetailPage() {
   const stopOneByOneRef = useRef(false);
   const [importingQoderModels, setImportingQoderModels] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchNotice, setFetchNotice] = useState(""); // non-blocking Fetch Models result
   // Per-model settings keyed by "<providerId>/<modelId>" → { effort, context }
   const [modelSettings, setModelSettings] = useState({});
   const { copied, copy } = useCopyToClipboard();
@@ -566,25 +567,31 @@ export default function ProviderDetailPage() {
 
   // Fetch the live model list from the provider's API and add any new ones.
   // Works for every provider with a models endpoint (Claude Code, Copilot, Codex, …).
+  const notifyFetch = (msg) => {
+    setFetchNotice(msg);
+    setTimeout(() => setFetchNotice(""), 6000);
+  };
+
   const handleFetchProviderModels = async () => {
     if (fetchingModels) return;
     const activeConnection = connections.find((conn) => conn.isActive !== false) || connections[0];
     if (!activeConnection) {
-      alert(translate("Please add a connection first"));
+      notifyFetch("⚠ Add a connection first.");
       return;
     }
 
     setFetchingModels(true);
+    setFetchNotice("");
     try {
       const res = await fetch(`/api/providers/${activeConnection.id}/models`);
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || translate("Failed to fetch models"));
+        notifyFetch(`✗ Fetch failed: ${data.error || `HTTP ${res.status}`}`);
         return;
       }
       const fetched = data.models || [];
       if (fetched.length === 0) {
-        alert(data.warning || translate("No models returned"));
+        notifyFetch(`✗ No models returned${data.warning ? ` — ${data.warning}` : ""}`);
         return;
       }
 
@@ -622,11 +629,16 @@ export default function ProviderDetailPage() {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
       }
 
-      // No popup — fetched models appear in "Disabled models" as the feedback.
+      // Non-blocking inline notice (no popup). New models also appear in "Disabled models".
+      notifyFetch(
+        newIds.length === 0
+          ? `✓ Fetched ${fetched.length} — all already listed`
+          : `✓ Fetched ${fetched.length} · added ${newIds.length} to Disabled (enable below)`
+      );
       if (data.warning) console.log("Fetch models warning:", data.warning);
     } catch (error) {
       console.log("Error fetching provider models:", error);
-      alert(translate("Error fetching models") + ": " + error.message);
+      notifyFetch(`✗ ${error.message}`);
     } finally {
       setFetchingModels(false);
     }
@@ -1632,10 +1644,15 @@ export default function ProviderDetailPage() {
             {"Available Models"}
           </h2>
           {!isCompatible && (() => {
-            const allIds = [
+            const registryIds = [
               ...models,
               ...kiloFreeModels.filter((fm) => !models.some((m) => m.id === fm.id)),
             ].filter((m) => { const k = getModelKind(m); return !k || k === "llm"; }).map((m) => m.id);
+            // Include fetched/custom models so Active/Disable All cover them too.
+            const customIds = customModels
+              .filter((e) => e.providerAlias === providerStorageAlias && (e.kind || e.type || "llm") === "llm")
+              .map((e) => e.id);
+            const allIds = [...new Set([...registryIds, ...customIds])];
             const activeIds = allIds.filter((id) => !disabledModelIds.includes(id));
             return (
               <div className="flex flex-wrap gap-2">
@@ -1661,6 +1678,9 @@ export default function ProviderDetailPage() {
             );
           })()}
         </div>
+        {fetchNotice && (
+          <p className={`mb-3 text-xs ${fetchNotice.startsWith("✓") ? "text-green-600" : "text-text-muted"}`}>{fetchNotice}</p>
+        )}
         {modelsTestNotice && (() => {
           const n = modelsTestNotice;
           const u = n.usage || {};

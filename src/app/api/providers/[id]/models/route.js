@@ -145,6 +145,59 @@ const fetchAnthropicModels = async (connection) => {
   }
 };
 
+// GitHub Copilot: the short-lived copilot token expires (~30 min). The /models
+// endpoint 401s on a stale token, so mint a fresh copilot token from the GitHub
+// OAuth access token and retry. (The chat executor refreshes separately.)
+const GITHUB_MODELS_HEADERS = {
+  "Content-Type": "application/json",
+  "Copilot-Integration-Id": "vscode-chat",
+  "editor-version": "vscode/1.107.1",
+  "editor-plugin-version": "copilot-chat/0.26.7",
+  "user-agent": "GitHubCopilotChat/0.26.7",
+};
+
+const mintCopilotToken = async (githubAccessToken) => {
+  const res = await fetch("https://api.github.com/copilot_internal/v2/token", {
+    headers: {
+      Authorization: `token ${githubAccessToken}`,
+      "User-Agent": "GitHubCopilotChat/0.26.7",
+      "Editor-Version": "vscode/1.107.1",
+      "Editor-Plugin-Version": "copilot-chat/0.26.7",
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.token || null;
+};
+
+const fetchGithubModels = async (connection) => {
+  const ghToken = connection.accessToken;
+  if (!ghToken) return { error: "No valid token found", status: 401 };
+  const parse = (data) =>
+    (data?.data || [])
+      .filter((m) => m.capabilities?.type === "chat" && m.policy?.state !== "disabled")
+      .map((m) => ({ id: m.id, name: m.name || m.id }));
+  const doFetch = (tok) =>
+    fetch("https://api.githubcopilot.com/models", {
+      method: "GET",
+      headers: { ...GITHUB_MODELS_HEADERS, Authorization: `Bearer ${tok}` },
+    });
+  try {
+    let copilotToken = connection.providerSpecificData?.copilotToken;
+    let res = copilotToken ? await doFetch(copilotToken) : null;
+    if (!res || res.status === 401 || res.status === 403) {
+      const fresh = await mintCopilotToken(ghToken);
+      if (fresh) res = await doFetch(fresh);
+    }
+    if (res && res.ok) return { models: parse(await res.json()) };
+    const txt = res ? await res.text().catch(() => "") : "";
+    return { models: [], warning: `GitHub Copilot /models returned ${res?.status ?? "no token"}: ${String(txt).slice(0, 140)}` };
+  } catch (error) {
+    return { models: [], warning: `GitHub Copilot /models: ${error.message}` };
+  }
+};
+
 // Provider models endpoints configuration
 const PROVIDER_MODELS_CONFIG = {
   claude: { customResolver: fetchAnthropicModels },
@@ -180,33 +233,7 @@ const PROVIDER_MODELS_CONFIG = {
     body: {},
     parseResponse: (data) => data.models || []
   },
-  github: {
-    url: "https://api.githubcopilot.com/models",
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "Copilot-Integration-Id": "vscode-chat",
-      "editor-version": "vscode/1.107.1",
-      "editor-plugin-version": "copilot-chat/0.26.7",
-      "user-agent": "GitHubCopilotChat/0.26.7"
-    },
-    authHeader: "Authorization",
-    authPrefix: "Bearer ",
-    parseResponse: (data) => {
-      if (!data?.data) return [];
-      // Filter out embeddings, non-chat models, and disabled models
-      return data.data
-        .filter(m => m.capabilities?.type === "chat")
-        .filter(m => m.policy?.state !== "disabled") // Only return explicitly enabled models
-        .map(m => ({
-          id: m.id,
-          name: m.name || m.id,
-          version: m.version,
-          capabilities: m.capabilities,
-          isDefault: m.model_picker_enabled === true
-        }));
-    }
-  },
+  github: { customResolver: fetchGithubModels },
   openai: createOpenAIModelsConfig("https://api.openai.com/v1/models"),
   openrouter: createOpenAIModelsConfig("https://openrouter.ai/api/v1/models"),
   anthropic: { customResolver: fetchAnthropicModels },

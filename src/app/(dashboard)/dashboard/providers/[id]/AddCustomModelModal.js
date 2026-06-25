@@ -21,9 +21,9 @@ export default function AddCustomModelModal({ isOpen, providerAlias, providerDis
     return id.startsWith(prefix) ? id.slice(prefix.length) : id;
   };
 
-  const handleTest = async () => {
-    const cleanId = stripAlias(modelId.trim());
-    if (!cleanId) return;
+  // Ping the model; updates UI state and returns whether it passed.
+  const runTest = async (cleanId) => {
+    if (!cleanId) return false;
     setTestStatus("testing");
     setTestError("");
     try {
@@ -35,17 +35,24 @@ export default function AddCustomModelModal({ isOpen, providerAlias, providerDis
       const data = await res.json();
       setTestStatus(data.ok ? "ok" : "error");
       setTestError(data.error || "");
+      return !!data.ok;
     } catch (err) {
       setTestStatus("error");
       setTestError(err.message);
+      return false;
     }
   };
 
+  const handleTest = () => runTest(stripAlias(modelId.trim()));
+
+  // A model must pass a test before it is added.
   const handleSave = async () => {
     const cleanId = stripAlias(modelId.trim());
     if (!cleanId || saving) return;
     setSaving(true);
     try {
+      const passed = testStatus === "ok" ? true : await runTest(cleanId);
+      if (!passed) return; // gate: do not add a model that fails the test
       await onSave(cleanId);
     } finally {
       setSaving(false);
@@ -84,6 +91,7 @@ export default function AddCustomModelModal({ isOpen, providerAlias, providerDis
           <p className="text-xs text-text-muted mt-1">
             Sent to provider as: <code className="font-mono bg-sidebar px-1 rounded">{stripAlias(modelId.trim()) || "model-id"}</code>
           </p>
+          <p className="text-xs text-text-muted mt-1">The model is tested first and only added if it passes.</p>
         </div>
 
         {/* Test result */}
@@ -106,9 +114,10 @@ export default function AddCustomModelModal({ isOpen, providerAlias, providerDis
             onClick={handleSave}
             fullWidth
             size="sm"
-            disabled={!modelId.trim() || saving}
+            loading={saving}
+            disabled={!modelId.trim() || saving || testStatus === "testing"}
           >
-            {saving ? "Adding..." : "Add Model"}
+            {saving ? (testStatus === "testing" ? "Testing..." : "Adding...") : (testStatus === "ok" ? "Add Model" : "Test & Add")}
           </Button>
         </div>
       </div>

@@ -1050,17 +1050,22 @@ export default function ProviderDetailPage() {
       const data = await res.json();
       const ok = !!data.ok;
       setModelTestResults((prev) => ({ ...prev, [modelId]: ok ? "ok" : "error" }));
-      const latency = data.latencyMs != null ? ` (${data.latencyMs}ms)` : "";
-      const reply = (data.content || "").trim();
       setModelsTestNotice({
         ok,
-        text: ok
-          ? `✓ ${modelId}${latency} → ${reply ? reply.slice(0, 400) : "(empty response)"}`
-          : `✗ ${modelId}${latency} → ${data.error || "Model not reachable"}`,
+        modelId,
+        model: data.model || null,
+        latencyMs: data.latencyMs ?? null,
+        status: data.status ?? null,
+        usage: data.usage || null,
+        finishReason: data.finishReason || null,
+        reasoning: data.reasoning || "",
+        content: ok ? (data.content || "") : null,
+        error: ok ? null : (data.error || "Model not reachable"),
+        applied: modelSettings[`${providerId}/${modelId}`] || {},
       });
     } catch {
       setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
-      setModelsTestNotice({ ok: false, text: `✗ ${modelId} → Network error` });
+      setModelsTestNotice({ ok: false, modelId, error: "Network error", applied: modelSettings[`${providerId}/${modelId}`] || {} });
     } finally {
       setTestingModelIds((prev) => { const n = new Set(prev); n.delete(modelId); return n; });
     }
@@ -1674,9 +1679,48 @@ export default function ProviderDetailPage() {
             );
           })()}
         </div>
-        {modelsTestNotice && (
-          <p className={`text-xs mb-3 break-words whitespace-pre-wrap ${modelsTestNotice.ok ? "text-green-600" : "text-red-500"}`}>{modelsTestNotice.text}</p>
-        )}
+        {modelsTestNotice && (() => {
+          const n = modelsTestNotice;
+          const u = n.usage || {};
+          return (
+            <div className={`mb-3 w-full rounded-lg border px-3 py-2.5 text-xs ${n.ok ? "border-green-500/40 bg-green-500/5" : "border-red-500/40 bg-red-500/5"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-medium">
+                  <span className={n.ok ? "text-green-600" : "text-red-500"}>{n.ok ? "✓ Success" : "✗ Failed"}</span>
+                  <code className="rounded bg-sidebar px-1 py-0.5">{providerDisplayAlias}/{n.modelId}</code>
+                  {n.model && n.model !== n.modelId && (
+                    <span className="text-text-muted">upstream: <code className="rounded bg-sidebar px-1 py-0.5">{n.model}</code></span>
+                  )}
+                  {n.latencyMs != null && <span className="text-text-muted">⏱ {n.latencyMs}ms</span>}
+                  {n.status != null && <span className="text-text-muted">HTTP {n.status}</span>}
+                </div>
+                <button onClick={() => setModelsTestNotice(null)} className="shrink-0 text-text-muted hover:text-primary" title="Dismiss">
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-text-muted">
+                <span>Effort: <b className="text-text">{n.applied?.effort || "auto"}</b></span>
+                <span>Context: <b className="text-text">{n.applied?.context || "auto"}</b></span>
+                {u.prompt_tokens != null && (
+                  <span>Tokens: <b className="text-text">{u.prompt_tokens}</b> in / <b className="text-text">{u.completion_tokens ?? "?"}</b> out{u.total_tokens != null ? ` / ${u.total_tokens} total` : ""}</span>
+                )}
+                {n.finishReason && <span>Finish: <b className="text-text">{n.finishReason}</b></span>}
+              </div>
+              {n.reasoning ? (
+                <div className="mt-1.5">
+                  <span className="text-text-muted">Reasoning:</span>
+                  <p className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-sidebar/60 p-1.5 text-text-muted/80">{n.reasoning.slice(0, 800)}</p>
+                </div>
+              ) : null}
+              <div className="mt-1.5">
+                <span className="text-text-muted">{n.ok ? "Response:" : "Error:"}</span>
+                <p className={`mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap rounded p-1.5 ${n.ok ? "bg-sidebar/60 text-text" : "text-red-500"}`}>
+                  {n.ok ? (n.content || "(empty response)") : n.error}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
         {renderModelsSection()}
       </Card>
 

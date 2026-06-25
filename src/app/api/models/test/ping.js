@@ -191,8 +191,26 @@ export async function pingModelByKind(model, kind, baseUrl = `http://127.0.0.1:$
     };
   }
 
-  // Surface the model's reply text so the dashboard can display the actual response.
-  let content = parsed.choices[0]?.message?.content ?? "";
+  // Surface full response details so the dashboard can show everything about the test.
+  const choice = parsed.choices[0] || {};
+  let content = choice.message?.content ?? "";
   if (Array.isArray(content)) content = content.map((p) => p?.text || "").join("");
-  return { ok: true, latencyMs, error: null, status: res.status, content: String(content) };
+  const reasoning =
+    choice.message?.reasoning_content ||
+    choice.message?.reasoning ||
+    (Array.isArray(choice.message?.reasoning_details)
+      ? choice.message.reasoning_details.map((r) => (typeof r === "string" ? r : r?.text || r?.content || "")).join("")
+      : "") ||
+    "";
+  return {
+    ok: true,
+    latencyMs,
+    error: null,
+    status: res.status,
+    model: parsed.model || model,
+    content: String(content),
+    reasoning: String(reasoning || ""),
+    finishReason: choice.finish_reason || null,
+    usage: parsed.usage || null,
+  };
 }

@@ -72,6 +72,7 @@ export default function ProviderDetailPage() {
   const [oneByOneSummary, setOneByOneSummary] = useState(null);
   const stopOneByOneRef = useRef(false);
   const [importingQoderModels, setImportingQoderModels] = useState(false);
+  const [fetchingModels, setFetchingModels] = useState(false);
   const { copied, copy } = useCopyToClipboard();
 
   const AG_RISK_STORAGE_KEY = "ag_risk_confirmed";
@@ -534,6 +535,58 @@ export default function ProviderDetailPage() {
       alert(translate("Error fetching models") + ": " + error.message);
     } finally {
       setImportingQoderModels(false);
+    }
+  };
+
+  // Fetch the live model list from the provider's API and add any new ones.
+  // Works for every provider with a models endpoint (Claude Code, Copilot, Codex, …).
+  const handleFetchProviderModels = async () => {
+    if (fetchingModels) return;
+    const activeConnection = connections.find((conn) => conn.isActive !== false) || connections[0];
+    if (!activeConnection) {
+      alert(translate("Please add a connection first"));
+      return;
+    }
+
+    setFetchingModels(true);
+    try {
+      const res = await fetch(`/api/providers/${activeConnection.id}/models`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || translate("Failed to fetch models"));
+        return;
+      }
+      const fetched = data.models || [];
+      if (fetched.length === 0) {
+        alert(data.warning || translate("No models returned"));
+        return;
+      }
+
+      const knownIds = new Set(models.map((m) => m.id));
+      let added = 0;
+      for (const m of fetched) {
+        const rawId = m.id || m.name;
+        if (!rawId) continue;
+        // Strip any "provider/" prefix the API may include (e.g. "qoder/auto").
+        const modelId = String(rawId).replace(new RegExp(`^${providerStorageAlias}/`), "");
+        const exists =
+          knownIds.has(modelId) ||
+          customModels.some((e) => e.providerAlias === providerStorageAlias && e.id === modelId && (e.kind || e.type || "llm") === "llm") ||
+          Object.values(modelAliases).includes(`${providerStorageAlias}/${modelId}`);
+        if (exists) continue;
+        await handleAddCustomModel(modelId, "llm", providerStorageAlias);
+        added += 1;
+      }
+
+      const summary = added === 0
+        ? `${translate("Fetched")} ${fetched.length} ${translate("models")} — ${translate("all already added")}.`
+        : `${translate("Added")} ${added} ${translate("new model(s)")} (${fetched.length} ${translate("fetched")}).`;
+      alert(data.warning ? `${summary}\n\n${data.warning}` : summary);
+    } catch (error) {
+      console.log("Error fetching provider models:", error);
+      alert(translate("Error fetching models") + ": " + error.message);
+    } finally {
+      setFetchingModels(false);
     }
   };
 
@@ -1067,6 +1120,21 @@ export default function ProviderDetailPage() {
           <span className="material-symbols-outlined text-sm">add</span>
           Add Model
         </button>
+
+        {/* Fetch live model list from the provider's API (Claude Code, Copilot, Codex, …) */}
+        {connections.length > 0 && providerId !== "qoder" && (
+          <button
+            onClick={handleFetchProviderModels}
+            disabled={fetchingModels}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-500/40 px-3 py-2 text-xs text-blue-600 dark:text-blue-400 transition-colors hover:border-blue-500 hover:bg-blue-500/5 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            title={translate("Fetch the full model list from this provider's API")}
+          >
+            <span className="material-symbols-outlined text-sm" style={fetchingModels ? { animation: "spin 1s linear infinite" } : undefined}>
+              {fetchingModels ? "progress_activity" : "cloud_download"}
+            </span>
+            {fetchingModels ? translate("Fetching...") : translate("Fetch Models")}
+          </button>
+        )}
 
         {/* Import Qoder models button — only show for qoder provider */}
         {providerId === "qoder" && connections.some((conn) => conn.isActive !== false) && (

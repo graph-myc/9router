@@ -118,18 +118,36 @@ const buildOAuthResolver = ({ refreshFn, fetchFn, parseFn, errorLabel }) => asyn
   return { models: [], warning };
 };
 
+// Anthropic /v1/models: OAuth tokens (sk-ant-oat...) authenticate via
+// Authorization: Bearer + the oauth beta header; plain API keys use x-api-key.
+// (Sending an OAuth token via x-api-key returns 401.)
+const fetchAnthropicModels = async (connection) => {
+  const token = connection.accessToken || connection.apiKey;
+  if (!token) return { error: "No valid token found", status: 401 };
+  const isOAuth = typeof token === "string" && token.startsWith("sk-ant-oat");
+  const headers = { "Anthropic-Version": "2023-06-01", "Content-Type": "application/json" };
+  if (isOAuth) {
+    headers["Authorization"] = `Bearer ${token}`;
+    headers["Anthropic-Beta"] = "oauth-2025-04-20";
+  } else {
+    headers["x-api-key"] = token;
+  }
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/models?limit=1000", { method: "GET", headers });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { models: [], warning: `Anthropic /v1/models returned ${response.status}: ${errorText.slice(0, 160)}` };
+    }
+    const data = await response.json();
+    return { models: (data.data || []).map((m) => ({ id: m.id, name: m.display_name || m.id })) };
+  } catch (error) {
+    return { models: [], warning: `Anthropic /v1/models: ${error.message}` };
+  }
+};
+
 // Provider models endpoints configuration
 const PROVIDER_MODELS_CONFIG = {
-  claude: {
-    url: "https://api.anthropic.com/v1/models",
-    method: "GET",
-    headers: {
-      "Anthropic-Version": "2023-06-01",
-      "Content-Type": "application/json"
-    },
-    authHeader: "x-api-key",
-    parseResponse: (data) => data.data || []
-  },
+  claude: { customResolver: fetchAnthropicModels },
   gemini: {
     url: "https://generativelanguage.googleapis.com/v1beta/models",
     method: "GET",
@@ -191,16 +209,7 @@ const PROVIDER_MODELS_CONFIG = {
   },
   openai: createOpenAIModelsConfig("https://api.openai.com/v1/models"),
   openrouter: createOpenAIModelsConfig("https://openrouter.ai/api/v1/models"),
-  anthropic: {
-    url: "https://api.anthropic.com/v1/models",
-    method: "GET",
-    headers: {
-      "Anthropic-Version": "2023-06-01",
-      "Content-Type": "application/json"
-    },
-    authHeader: "x-api-key",
-    parseResponse: (data) => data.data || []
-  },
+  anthropic: { customResolver: fetchAnthropicModels },
 
   alicode: {
     url: "https://coding.dashscope.aliyuncs.com/v1/models",

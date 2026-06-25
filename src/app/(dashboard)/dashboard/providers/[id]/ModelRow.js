@@ -1,6 +1,14 @@
 import PropTypes from "prop-types";
 import { CapacityBadges } from "@/shared/components";
 
+// Compact token formatter: 1000000 → "1M", 200000 → "200K".
+function fmtTokens(n) {
+  if (!n || typeof n !== "number") return "";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
 export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps }) {
   const borderColor = testStatus === "ok"
     ? "border-green-500/40"
@@ -25,9 +33,25 @@ export default function ModelRow({ model, fullModel, alias, copied, onCopy, test
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <code className="max-w-[72vw] truncate rounded bg-sidebar px-1.5 py-0.5 font-mono text-xs text-text-muted sm:max-w-[360px]">{fullModel}</code>
-          <span className="flex min-w-0 items-center text-[9px] gap-1 pl-1">
+          <span className="flex min-w-0 flex-wrap items-center text-[9px] gap-1 pl-1">
             {model.name && <span className="truncate text-[9px] italic text-text-muted/70">{model.name}</span>}
             <CapacityBadges caps={caps} colorOverride="text-text-muted/70" size={12} />
+            {caps?.contextWindow ? (
+              <span
+                className="rounded bg-sidebar px-1 text-[9px] font-medium text-text-muted/70"
+                title={`Context window: ${caps.contextWindow.toLocaleString()} tokens${caps.maxOutput ? ` · max output ${caps.maxOutput.toLocaleString()}` : ""}`}
+              >
+                {fmtTokens(caps.contextWindow)} ctx
+              </span>
+            ) : null}
+            {caps?.maxEffort && caps.maxEffort !== "high" ? (
+              <span
+                className="rounded bg-sidebar px-1 text-[9px] font-medium text-amber-500/80"
+                title={`Supports reasoning effort up to "${caps.maxEffort}"`}
+              >
+                {caps.maxEffort} effort
+              </span>
+            ) : null}
           </span>
         </div>
         {onTest && (

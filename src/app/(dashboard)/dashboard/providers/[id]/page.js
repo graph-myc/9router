@@ -1151,7 +1151,7 @@ export default function ProviderDetailPage() {
             onEffortChange={(v) => saveModelSetting(model.id, { effort: v })}
             context={modelSettings[`${providerId}/${model.id}`]?.context || "auto"}
             onContextChange={(v) => saveModelSetting(model.id, { context: v })}
-            showContext={providerId === "claude" || isAnthropicCompatibleProvider(providerId)}
+            showContext={true}
           />
         ))}
 
@@ -1181,7 +1181,7 @@ export default function ProviderDetailPage() {
               onEffortChange={(v) => saveModelSetting(model.id, { effort: v })}
               context={modelSettings[`${providerId}/${model.id}`]?.context || "auto"}
               onContextChange={(v) => saveModelSetting(model.id, { context: v })}
-              showContext={providerId === "claude" || isAnthropicCompatibleProvider(providerId)}
+              showContext={true}
             />
           );
         })}

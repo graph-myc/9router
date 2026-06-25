@@ -50,6 +50,9 @@ export default {
     },
   },
   models: [
+    // Copilot auto model selection — GitHub picks the model and applies a 10%
+    // discount on premium-request usage.
+    { id: "auto", name: "Auto (smart pick · −10% premium)" },
     { id: "gpt-5.2", name: "GPT-5.2" },
     { id: "gpt-5.2-codex", name: "GPT-5.2 Codex" },
     { id: "gpt-5.3-codex", name: "GPT-5.3 Codex" },

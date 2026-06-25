@@ -589,7 +589,7 @@ export default function ProviderDetailPage() {
       }
 
       const knownIds = new Set(models.map((m) => m.id));
-      let added = 0;
+      const newIds = [];
       for (const m of fetched) {
         const rawId = m.id || m.name;
         if (!rawId) continue;
@@ -599,14 +599,32 @@ export default function ProviderDetailPage() {
           knownIds.has(modelId) ||
           customModels.some((e) => e.providerAlias === providerStorageAlias && e.id === modelId && (e.kind || e.type || "llm") === "llm") ||
           Object.values(modelAliases).includes(`${providerStorageAlias}/${modelId}`);
-        if (exists) continue;
-        await handleAddCustomModel(modelId, "llm", providerStorageAlias);
-        added += 1;
+        if (!exists && !newIds.includes(modelId)) newIds.push(modelId);
       }
 
-      const summary = added === 0
-        ? `${translate("Fetched")} ${fetched.length} ${translate("models")} — ${translate("all already added")}.`
-        : `${translate("Added")} ${added} ${translate("new model(s)")} (${fetched.length} ${translate("fetched")}).`;
+      // Add new models as custom, then disable them so they land in "Disabled
+      // models" for manual opt-in instead of auto-activating.
+      for (const id of newIds) {
+        await fetch("/api/models/custom", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ providerAlias: providerStorageAlias, id, type: "llm" }),
+        });
+      }
+      if (newIds.length > 0) {
+        await fetch("/api/models/disabled", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ providerAlias: providerStorageAlias, ids: newIds }),
+        });
+        await fetchCustomModels();
+        await fetchDisabledModels();
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
+      }
+
+      const summary = newIds.length === 0
+        ? `${translate("Fetched")} ${fetched.length} ${translate("models")} — ${translate("all already listed")}.`
+        : `${translate("Fetched")} ${fetched.length}. ${translate("Added")} ${newIds.length} ${translate("to Disabled models — enable the ones you want")}.`;
       alert(data.warning ? `${summary}\n\n${data.warning}` : summary);
     } catch (error) {
       console.log("Error fetching provider models:", error);
@@ -1076,13 +1094,18 @@ export default function ProviderDetailPage() {
     const disabledSet = new Set(disabledModelIds);
     const displayModels = allModels.filter((m) => !disabledSet.has(m.id));
     const disabledDisplayModels = allModels.filter((m) => disabledSet.has(m.id));
-    const customModelRows = getProviderCustomModelRows({
+    const customModelRowsAll = getProviderCustomModelRows({
       customModels,
       modelAliases,
       providerAlias: providerStorageAlias,
       builtInModels: models,
       type: "llm",
     });
+    // Fetched models are added as disabled custom models → show them as restorable
+    // chips in "Disabled models", and keep only enabled ones as active cards.
+    const customModelRows = customModelRowsAll.filter((m) => !disabledSet.has(m.id));
+    const disabledCustomRows = customModelRowsAll.filter((m) => disabledSet.has(m.id));
+    const allDisabledRows = [...disabledDisplayModels, ...disabledCustomRows];
 
     return (
       <div className="flex flex-wrap gap-3">
@@ -1219,17 +1242,17 @@ export default function ProviderDetailPage() {
           );
         })()}
 
-        {/* Disabled models — restorable */}
-        {disabledDisplayModels.length > 0 && (
+        {/* Disabled models — restorable (registry + fetched). Click to enable. */}
+        {allDisabledRows.length > 0 && (
           <div className="w-full mt-2">
-            <p className="text-xs text-text-muted mb-2">Disabled models ({disabledDisplayModels.length}):</p>
+            <p className="text-xs text-text-muted mb-2">Disabled models ({allDisabledRows.length}) — click to enable:</p>
             <div className="flex flex-wrap gap-2">
-              {disabledDisplayModels.map((m) => (
+              {allDisabledRows.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => handleEnableModel(m.id)}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 text-xs text-text-muted hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                  title="Restore model"
+                  title="Enable model"
                 >
                   <span className="material-symbols-outlined text-[13px]">add</span>
                   {m.id}

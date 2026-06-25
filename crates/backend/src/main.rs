@@ -47,6 +47,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/version", get(version))
         .route("/v1/models", get(list_models))
+        .route("/api/combos", get(list_combos))
         .route("/v1/chat/completions", post(chat))
         .with_state(orch)
         .layer(CorsLayer::permissive())
@@ -76,6 +77,10 @@ async fn list_models(State(orch): State<SharedOrch>) -> Json<serde_json::Value> 
         .map(|m| serde_json::json!({ "id": m.id, "object": "model", "name": m.name }))
         .collect();
     Json(serde_json::json!({ "object": "list", "data": data }))
+}
+
+async fn list_combos(State(orch): State<SharedOrch>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "combos": orch.combos() }))
 }
 
 async fn chat(State(orch): State<SharedOrch>, Json(req): Json<ChatRequest>) -> Response {

@@ -1,0 +1,59 @@
+# 9Router (Rust) slice config — providers + combos.
+# Keys come from env vars (api_key_env); never commit literal keys.
+# Edit the providers below to your own OpenAI-compatible endpoints.
+
+[server]
+port = 20129
+
+# ---- Providers (any OpenAI-compatible /chat/completions endpoint) ----
+
+[[providers]]
+id = "openai"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+models = [{ id = "gpt-4o-mini" }, { id = "gpt-4o" }]
+
+[[providers]]
+id = "glm"
+base_url = "https://api.z.ai/api/paas/v4"
+api_key_env = "GLM_API_KEY"
+models = [{ id = "glm-4.6" }]
+
+[[providers]]
+id = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+models = [{ id = "meta-llama/llama-3.1-8b-instruct" }]
+
+# ---- Combos (the aggregator strategies) ----
+
+[[combos]]
+name = "free-fallback"
+strategy = "fallback"
+targets = [
+  { provider = "openai", model = "gpt-4o-mini" },
+  { provider = "glm", model = "glm-4.6" },
+  { provider = "openrouter", model = "meta-llama/llama-3.1-8b-instruct" },
+]
+
+[[combos]]
+name = "balance-rr"
+strategy = "round_robin"
+sticky = 1
+targets = [
+  { provider = "openai", model = "gpt-4o-mini" },
+  { provider = "glm", model = "glm-4.6" },
+]
+
+[[combos]]
+name = "panel-fusion"
+strategy = "fusion"
+min_panel = 2
+grace_ms = 8000
+hard_timeout_ms = 90000
+judge = { provider = "openai", model = "gpt-4o" }
+targets = [
+  { provider = "openai", model = "gpt-4o-mini" },
+  { provider = "glm", model = "glm-4.6" },
+  { provider = "openrouter", model = "meta-llama/llama-3.1-8b-instruct" },
+]

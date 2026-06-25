@@ -1,0 +1,15 @@
+[build]
+target = "index.html"
+
+[serve]
+port = 8080
+# Proxy API calls to the running backend during `trunk serve`.
+
+[[proxy]]
+backend = "http://localhost:20129/v1"
+
+[[proxy]]
+backend = "http://localhost:20129/health"
+
+[[proxy]]
+backend = "http://localhost:20129/version"

@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/aggregator", "crates/backend", "crates/frontend"]
+# Frontend is a WASM (Leptos) crate built with trunk; keep it out of the default
+# host build so `cargo build` / `cargo test` cover the backend + core.
+default-members = ["crates/aggregator", "crates/backend"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+authors = ["graph-myc"]
+description = "9Router — agentic orchestrator (Aggregator), Rust rewrite"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+futures = "0.3"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -1,0 +1,18 @@
+[package]
+name = "aggregator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "9Router agentic orchestrator core: provider trait + fallback / round-robin / fusion strategies"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }

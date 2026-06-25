@@ -1,0 +1,19 @@
+[package]
+name = "frontend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "9Router frontend — Leptos (CSR) status + test UI for the aggregator"
+
+[[bin]]
+name = "frontend"
+path = "src/main.rs"
+
+[dependencies]
+leptos = { version = "0.7", features = ["csr"] }
+gloo-net = "0.6"
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"

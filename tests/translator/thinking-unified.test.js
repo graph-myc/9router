@@ -60,6 +60,26 @@ describe("applyThinking per provider format", () => {
     expect(out.output_config).toEqual({ effort: "high" });
     expect(out.thinking).toBeUndefined();
   });
+  it("cc opus-4-8 (dash id) → adaptive output_config, never budget_tokens", () => {
+    const out = apply("claude", "claude-opus-4-8", { reasoning_effort: "high" }, "claude");
+    expect(out.output_config).toEqual({ effort: "high" });
+    expect(out.thinking).toBeUndefined();
+  });
+  it("cc opus-4-8 keeps xhigh/max (maxEffort:max), not downgraded to high", () => {
+    expect(apply("claude", "claude-opus-4-8", { reasoning_effort: "xhigh" }, "claude").output_config).toEqual({ effort: "xhigh" });
+    expect(apply("claude", "claude-opus-4-8", { reasoning_effort: "max" }, "claude").output_config).toEqual({ effort: "max" });
+  });
+  it("opus-4.6 folds xhigh down to high (no xhigh support)", () => {
+    expect(apply("claude", "claude-opus-4-6", { reasoning_effort: "xhigh" }, "claude").output_config).toEqual({ effort: "high" });
+  });
+  it("gh Copilot opus-4.8 → openai reasoning_effort xhigh (not output_config)", () => {
+    const out = apply("openai", "claude-opus-4.8", { reasoning_effort: "xhigh" }, "github");
+    expect(out.reasoning_effort).toBe("xhigh");
+    expect(out.output_config).toBeUndefined();
+  });
+  it("gh Copilot opus-4.6 folds xhigh down to high", () => {
+    expect(apply("openai", "claude-opus-4.6", { reasoning_effort: "xhigh" }, "github").reasoning_effort).toBe("high");
+  });
   it("claude haiku → enabled+budget", () => {
     const out = apply("claude", "claude-haiku-4.5", { reasoning_effort: "high" }, "claude");
     expect(out.thinking).toEqual({ type: "enabled", budget_tokens: 24576 });

@@ -18,6 +18,9 @@ export default {
   transport: {
     baseUrl: "https://api.githubcopilot.com/chat/completions",
     responsesUrl: "https://api.githubcopilot.com/responses",
+    // Copilot's chat/completions is OpenAI-shaped — express reasoning as
+    // reasoning_effort, never Claude's output_config (Copilot ignores/rejects it).
+    thinkingFormat: "openai",
     headers: {
       "copilot-integration-id": "vscode-chat",
       "editor-version": "vscode/1.110.0",
@@ -52,6 +55,7 @@ export default {
     { id: "claude-sonnet-4.6", name: "Claude Sonnet 4.6" },
     { id: "claude-opus-4.6", name: "Claude Opus 4.6" },
     { id: "claude-opus-4.7", name: "Claude Opus 4.7" },
+    { id: "claude-opus-4.8", name: "Claude Opus 4.8" },
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
     { id: "gemini-3-flash-preview", name: "Gemini 3 Flash" },
     { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro" },

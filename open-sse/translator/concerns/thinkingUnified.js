@@ -4,7 +4,7 @@
 
 import { getCapabilitiesForModel } from "../../providers/capabilities.js";
 import { PROVIDERS } from "../../providers/index.js";
-import { LEVEL_TO_BUDGET, budgetToLevel, effortToBudget } from "./thinking.js";
+import { LEVEL_TO_BUDGET, budgetToLevel, effortToBudget, EFFORT_LEVELS } from "./thinking.js";
 
 // Map a target wire-format to its native thinking format (when capability has none).
 const FORMAT_TO_NATIVE = {
@@ -127,6 +127,19 @@ function toLevel(cfg) {
   return null;
 }
 
+// Fold a requested effort level down to the model's ceiling (caps.maxEffort,
+// default "high"). e.g. "xhigh"/"max" → "high" on models that top out at high,
+// but pass through unchanged on Opus 4.7/4.8 (maxEffort:"max"). "auto" and
+// unknown levels are returned untouched.
+function clampEffort(level, caps) {
+  if (!level || level === "auto") return level;
+  const ceiling = caps?.maxEffort || "high";
+  const li = EFFORT_LEVELS.indexOf(level);
+  const ci = EFFORT_LEVELS.indexOf(ceiling);
+  if (li === -1 || ci === -1) return level;
+  return li > ci ? ceiling : level;
+}
+
 // Gemini nests thinkingConfig under generationConfig. gemini-cli / antigravity wrap
 // the whole request in a { request: { generationConfig } } envelope — target the
 // envelope's generationConfig when present, else the top-level one.
@@ -162,14 +175,14 @@ function applyFormat(fmt, body, cfg, caps) {
   switch (fmt) {
     case "openai": {
       if (none && canDisable) { body.reasoning_effort = "none"; break; }
-      const level = toLevel(eff);
-      if (level) body.reasoning_effort = level === "xhigh" || level === "max" ? "high" : level;
+      const level = clampEffort(toLevel(eff), caps);
+      if (level) body.reasoning_effort = level;
       break;
     }
     case "claude-adaptive": {
       if (none && canDisable) { body.thinking = { type: "disabled" }; break; }
-      const level = toLevel(eff);
-      body.output_config = { effort: level === "xhigh" ? "high" : level };
+      const level = clampEffort(toLevel(eff), caps);
+      body.output_config = { effort: level };
       break;
     }
     case "claude-budget": {

@@ -57,7 +57,7 @@ export const THINKING_CONFIG = {
     defaultBudgetTokens: 10000
   },
   effort: {
-    options: ["auto", "none", "low", "medium", "high"],
+    options: ["auto", "none", "low", "medium", "high", "xhigh", "max"],
     defaultMode: "auto"
   }
 };

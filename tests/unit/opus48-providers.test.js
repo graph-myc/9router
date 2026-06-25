@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { getCapabilitiesForModel } from "../../open-sse/providers/capabilities.js";
 import { stripUnsupportedParams } from "../../open-sse/translator/concerns/paramSupport.js";
+import { normalizeClaudePassthrough } from "../../open-sse/translator/formats/claude.js";
 
 describe("Opus 4.8 capabilities (cc dash + gh dot ids)", () => {
   for (const [provider, model] of [
@@ -40,5 +41,29 @@ describe("GitHub Copilot reasoning_effort stripping (#713)", () => {
     const body = { reasoning_effort: "high" };
     stripUnsupportedParams("github", "claude-opus-4.5", body);
     expect(body.reasoning_effort).toBeUndefined();
+  });
+});
+
+describe("Claude Code passthrough folds provider-effort override into output_config", () => {
+  const fold = (model, body) => { const b = { messages: [], ...body }; normalizeClaudePassthrough(b, model); return b; };
+
+  it("reasoning_effort xhigh/max → output_config.effort on Opus 4.8 (native Claude has no reasoning_effort)", () => {
+    expect(fold("claude-opus-4-8", { reasoning_effort: "xhigh" })).toMatchObject({ output_config: { effort: "xhigh" } });
+    expect(fold("claude-opus-4-8", { reasoning_effort: "max" })).toMatchObject({ output_config: { effort: "max" } });
+    expect(fold("claude-opus-4-8", { reasoning_effort: "xhigh" }).reasoning_effort).toBeUndefined();
+  });
+
+  it("clamps xhigh down to high on Opus 4.6 (no xhigh support)", () => {
+    expect(fold("claude-opus-4-6", { reasoning_effort: "xhigh" })).toMatchObject({ output_config: { effort: "high" } });
+  });
+
+  it("none/off → disable thinking", () => {
+    expect(fold("claude-opus-4-8", { reasoning_effort: "none" })).toMatchObject({ thinking: { type: "disabled" } });
+  });
+
+  it("does not override an effort the client already set", () => {
+    const out = fold("claude-opus-4-8", { reasoning_effort: "low", output_config: { effort: "xhigh" } });
+    expect(out.output_config.effort).toBe("xhigh");
+    expect(out.reasoning_effort).toBeUndefined();
   });
 });

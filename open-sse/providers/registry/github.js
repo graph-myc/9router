@@ -15,6 +15,12 @@ export default {
     deprecationNotice: "RISK_NOTICE",
   },
   category: "oauth",
+  // Copilot maps reasoning_effort for its reasoning models (GPT-5.x, Claude 4.6+) —
+  // expose the effort selector (incl. xhigh/max). "auto" leaves the client in control.
+  thinkingConfig: {
+    options: ["auto", "none", "low", "medium", "high", "xhigh", "max"],
+    defaultMode: "auto",
+  },
   transport: {
     baseUrl: "https://api.githubcopilot.com/chat/completions",
     responsesUrl: "https://api.githubcopilot.com/responses",

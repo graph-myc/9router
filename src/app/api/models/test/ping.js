@@ -50,9 +50,13 @@ async function getInternalHeaders() {
   return headers;
 }
 
-export async function pingModelByKind(model, kind, baseUrl = `http://127.0.0.1:${process.env.PORT || UPDATER_CONFIG.appPort}`) {
+export async function pingModelByKind(model, kind, baseUrl = `http://127.0.0.1:${process.env.PORT || UPDATER_CONFIG.appPort}`, options = {}) {
   const headers = await getInternalHeaders();
   const start = Date.now();
+  // verbose: request a few real tokens and return the model's reply so the
+  // dashboard can show the actual response (not just pass/fail). Default ping
+  // stays a cheap 1-token reachability check.
+  const llmMaxTokens = options.maxTokens ?? 1;
 
   if (kind === "embedding") {
     const res = await fetch(`${baseUrl}/api/v1/embeddings`, {
@@ -135,7 +139,7 @@ export async function pingModelByKind(model, kind, baseUrl = `http://127.0.0.1:$
     headers,
     body: JSON.stringify({
       model,
-      max_tokens: 1,
+      max_tokens: llmMaxTokens,
       stream: false,
       messages: [{ role: "user", content: "hi" }],
     }),
@@ -187,5 +191,8 @@ export async function pingModelByKind(model, kind, baseUrl = `http://127.0.0.1:$
     };
   }
 
-  return { ok: true, latencyMs, error: null, status: res.status };
+  // Surface the model's reply text so the dashboard can display the actual response.
+  let content = parsed.choices[0]?.message?.content ?? "";
+  if (Array.isArray(content)) content = content.map((p) => p?.text || "").join("");
+  return { ok: true, latencyMs, error: null, status: res.status, content: String(content) };
 }

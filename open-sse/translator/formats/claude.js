@@ -92,6 +92,23 @@ const ADAPTIVE_THINKING_UNSUPPORTED = /haiku/i;
 export function normalizeClaudePassthrough(body, model = "") {
   if (!body || typeof body !== "object") return body;
 
+  // 0. A provider-level effort override (chatCore) injects OpenAI-style
+  //    reasoning_effort, which native Claude rejects. Fold it into
+  //    output_config.effort, clamped to the model's ceiling so xhigh/max only
+  //    reach models that support them (Opus 4.7/4.8). none/off → disable thinking.
+  if (body.reasoning_effort != null) {
+    const raw = String(body.reasoning_effort).toLowerCase();
+    delete body.reasoning_effort;
+    if (raw === "none" || raw === "off") {
+      if (!body.thinking) body.thinking = { type: "disabled" };
+    } else if (raw !== "auto" && body.output_config?.effort == null) {
+      const order = ["minimal", "low", "medium", "high", "xhigh", "max"];
+      const ceiling = getCapabilitiesForModel("claude", model).maxEffort || "high";
+      const eff = order.indexOf(raw) > order.indexOf(ceiling) ? ceiling : raw;
+      body.output_config = { ...(body.output_config || {}), effort: eff };
+    }
+  }
+
   // 1. Downgrade adaptive thinking for models that don't support it
   if (body.thinking?.type === "adaptive" && ADAPTIVE_THINKING_UNSUPPORTED.test(model)) {
     body.thinking = { type: "enabled", budget_tokens: 10000 };

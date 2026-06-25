@@ -17,6 +17,12 @@ export default {
     deprecationNotice: "RISK_NOTICE",
   },
   category: "oauth",
+  // Opus 4.x accepts output_config.effort (incl. xhigh/max on 4.7/4.8) — expose the
+  // reasoning-effort selector in the dashboard. "auto" leaves the client in control.
+  thinkingConfig: {
+    options: ["auto", "none", "low", "medium", "high", "xhigh", "max"],
+    defaultMode: "auto",
+  },
   transport: {
     baseUrl: "https://api.anthropic.com/v1/messages",
     format: "claude",

@@ -49,7 +49,8 @@ export default function ProviderDetailPage() {
   const [customModels, setCustomModels] = useState([]);
   const [headerImgError, setHeaderImgError] = useState(false);
   const [modelTestResults, setModelTestResults] = useState({});
-  const [modelsTestError, setModelsTestError] = useState("");
+  // { ok: boolean, text: string } — last manual model-test result (pass/fail + response)
+  const [modelsTestNotice, setModelsTestNotice] = useState(null);
   const [testingModelIds, setTestingModelIds] = useState(() => new Set());
   const [showAddCustomModel, setShowAddCustomModel] = useState(false);
   const [selectedConnectionIds, setSelectedConnectionIds] = useState([]);
@@ -947,14 +948,22 @@ export default function ProviderDetailPage() {
       const res = await fetch("/api/models/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: `${providerStorageAlias}/${modelId}` }),
+        body: JSON.stringify({ model: `${providerStorageAlias}/${modelId}`, verbose: true }),
       });
       const data = await res.json();
-      setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? "ok" : "error" }));
-      setModelsTestError(data.ok ? "" : (data.error || "Model not reachable"));
+      const ok = !!data.ok;
+      setModelTestResults((prev) => ({ ...prev, [modelId]: ok ? "ok" : "error" }));
+      const latency = data.latencyMs != null ? ` (${data.latencyMs}ms)` : "";
+      const reply = (data.content || "").trim();
+      setModelsTestNotice({
+        ok,
+        text: ok
+          ? `✓ ${modelId}${latency} → ${reply ? reply.slice(0, 400) : "(empty response)"}`
+          : `✗ ${modelId}${latency} → ${data.error || "Model not reachable"}`,
+      });
     } catch {
       setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
-      setModelsTestError("Network error");
+      setModelsTestNotice({ ok: false, text: `✗ ${modelId} → Network error` });
     } finally {
       setTestingModelIds((prev) => { const n = new Set(prev); n.delete(modelId); return n; });
     }
@@ -1341,10 +1350,10 @@ export default function ProviderDetailPage() {
                   )}
                 </>
               )}
-              {/* Thinking config */}
-              {/* {thinkingConfig && (
+              {/* Thinking / reasoning-effort config */}
+              {thinkingConfig && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-muted font-medium">Thinking</span>
+                  <span className="text-xs text-text-muted font-medium">{thinkingConfig.options.includes("xhigh") ? "Effort" : "Thinking"}</span>
                   <select
                     value={thinkingMode}
                     onChange={(e) => handleThinkingModeChange(e.target.value)}
@@ -1355,7 +1364,7 @@ export default function ProviderDetailPage() {
                     ))}
                   </select>
                 </div>
-              )} */}
+              )}
               {/* Round Robin toggle */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-text-muted font-medium">Round Robin</span>
@@ -1538,8 +1547,8 @@ export default function ProviderDetailPage() {
             );
           })()}
         </div>
-        {!!modelsTestError && (
-          <p className="text-xs text-red-500 mb-3 break-words">{modelsTestError}</p>
+        {modelsTestNotice && (
+          <p className={`text-xs mb-3 break-words whitespace-pre-wrap ${modelsTestNotice.ok ? "text-green-600" : "text-red-500"}`}>{modelsTestNotice.text}</p>
         )}
         {renderModelsSection()}
       </Card>

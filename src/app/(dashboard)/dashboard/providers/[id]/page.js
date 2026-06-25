@@ -622,10 +622,8 @@ export default function ProviderDetailPage() {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
       }
 
-      const summary = newIds.length === 0
-        ? `${translate("Fetched")} ${fetched.length} ${translate("models")} — ${translate("all already listed")}.`
-        : `${translate("Fetched")} ${fetched.length}. ${translate("Added")} ${newIds.length} ${translate("to Disabled models — enable the ones you want")}.`;
-      alert(data.warning ? `${summary}\n\n${data.warning}` : summary);
+      // No popup — fetched models appear in "Disabled models" as the feedback.
+      if (data.warning) console.log("Fetch models warning:", data.warning);
     } catch (error) {
       console.log("Error fetching provider models:", error);
       alert(translate("Error fetching models") + ": " + error.message);

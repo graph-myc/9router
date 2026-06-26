@@ -24,6 +24,41 @@ fn pretty_strategy(s: &str) -> String {
     s.replace('_', "-")
 }
 
+/// Inline SVG icon (Lucide, MIT) rendered at `currentColor` — crisp, offline, no emoji.
+fn icon(name: &str) -> impl IntoView {
+    let inner = match name {
+        "plug" => r#"<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>"#,
+        "cpu" => r#"<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>"#,
+        "server" => r#"<rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/>"#,
+        "box" => r#"<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>"#,
+        "layers" => r#"<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>"#,
+        "play" => r#"<polygon points="6 3 20 12 6 21 6 3"/>"#,
+        "mic" => r#"<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>"#,
+        "bar-chart" => r#"<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>"#,
+        "trending-up" => r#"<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>"#,
+        "terminal" => r#"<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>"#,
+        "languages" => r#"<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>"#,
+        "globe" => r#"<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>"#,
+        "wrench" => r#"<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>"#,
+        "shield" => r#"<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>"#,
+        "sparkles" => r#"<path d="M9.94 14.06A2 2 0 0 0 8.5 12.6L2.5 11a.5.5 0 0 1 0-1l6-1.6A2 2 0 0 0 9.94 6.94L11.5 1a.5.5 0 0 1 1 0l1.56 5.94A2 2 0 0 0 15.5 8.4l6 1.6a.5.5 0 0 1 0 1l-6 1.6a2 2 0 0 0-1.44 1.46L12.5 21a.5.5 0 0 1-1 0z"/>"#,
+        "key" => r#"<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>"#,
+        "dollar" => r#"<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>"#,
+        "settings" => r#"<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>"#,
+        "user" => r#"<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>"#,
+        "construction" => r#"<rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="M10 14 2.3 6.3"/><path d="m14 6 7.7 7.7"/><path d="m8 6 8 8"/>"#,
+        "activity" => r#"<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>"#,
+        "plus" => r#"<path d="M5 12h14"/><path d="M12 5v14"/>"#,
+        "network" => r#"<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>"#,
+        _ => r#"<circle cx="12" cy="12" r="9"/>"#,
+    };
+    view! {
+        <svg class="ic-svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" inner_html=inner></svg>
+    }
+}
+
 #[component]
 fn App() -> impl IntoView {
     let view = RwSignal::new("endpoint".to_string());
@@ -118,43 +153,43 @@ fn App() -> impl IntoView {
 
 #[component]
 fn Sidebar(view: RwSignal<String>) -> impl IntoView {
-    let item = move |key: &'static str, icon: &'static str, label: &'static str| {
+    let item = move |key: &'static str, ic: &'static str, label: &'static str| {
         view! {
             <button class="navitem" class:active=move || view.get() == key
                 on:click=move |_| view.set(key.to_string())>
-                <span class="ic">{icon}</span><span>{label}</span>
+                <span class="ic">{icon(ic)}</span><span>{label}</span>
             </button>
         }
     };
     view! {
         <aside class="sidebar">
             <div class="brand">
-                <div class="logo">"✦"</div>
+                <div class="logo">{icon("network")}</div>
                 <div><h1>"M Y C"</h1><small>"Aggregator · v0.0.2"</small></div>
             </div>
-            {item("endpoint", "🔌", "Endpoint")}
-            {item("providers", "🧠", "Providers")}
-            {item("nodes", "🛰", "Provider Nodes")}
-            {item("models", "📦", "Models")}
-            {item("combos", "🧩", "Combos")}
-            {item("playground", "▶", "Playground")}
+            {item("endpoint", "plug", "Endpoint")}
+            {item("providers", "cpu", "Providers")}
+            {item("nodes", "server", "Provider Nodes")}
+            {item("models", "box", "Models")}
+            {item("combos", "layers", "Combos")}
+            {item("playground", "play", "Playground")}
             <div class="navgroup">"Media"</div>
-            {item("media", "🎙", "Media Providers")}
+            {item("media", "mic", "Media Providers")}
             <div class="navgroup">"Monitoring"</div>
-            {item("usage", "📊", "Usage")}
-            {item("quota", "📈", "Quota")}
-            {item("console", "🖥", "Console Log")}
+            {item("usage", "bar-chart", "Usage")}
+            {item("quota", "trending-up", "Quota")}
+            {item("console", "terminal", "Console Log")}
             <div class="navgroup">"Tools"</div>
-            {item("translator", "🔁", "Translator")}
-            {item("proxy", "🌐", "Proxy Pools")}
-            {item("cli", "🧰", "CLI Tools")}
-            {item("mitm", "🕵", "MITM")}
-            {item("skills", "✨", "Skills")}
+            {item("translator", "languages", "Translator")}
+            {item("proxy", "globe", "Proxy Pools")}
+            {item("cli", "wrench", "CLI Tools")}
+            {item("mitm", "shield", "MITM")}
+            {item("skills", "sparkles", "Skills")}
             <div class="navgroup">"System"</div>
-            {item("keys", "🔑", "API Keys")}
-            {item("pricing", "💲", "Pricing")}
-            {item("settings", "⚙", "Settings")}
-            {item("profile", "👤", "Profile")}
+            {item("keys", "key", "API Keys")}
+            {item("pricing", "dollar", "Pricing")}
+            {item("settings", "settings", "Settings")}
+            {item("profile", "user", "Profile")}
         </aside>
     }
 }
@@ -200,7 +235,7 @@ fn Topbar(view: RwSignal<String>, version: RwSignal<String>) -> impl IntoView {
 fn PlaceholderView(title: &'static str, note: &'static str) -> impl IntoView {
     view! {
         <div class="card">
-            <h3><span>"🚧"</span>{title}</h3>
+            <h3><span>{icon("construction")}</span>{title}</h3>
             <p class="muted" style="margin:8px 0 0">{note}</p>
             <p class="muted" style="margin:6px 0 0">
                 "Part of the Mycelix migration — not implemented yet. Compare with the legacy app on :20129."
@@ -214,7 +249,7 @@ fn EndpointView(version: RwSignal<String>, models: Models, combos: Combos) -> im
     let (copied, set_copied) = signal(false);
     view! {
         <div class="card">
-            <h3><span>"🔌"</span>"API Endpoint"</h3>
+            <h3><span>{icon("plug")}</span>"API Endpoint"</h3>
             <div class="row">
                 <span class="chip">"Local"</span>
                 <input class="input" prop:value=API_BASE readonly=true/>
@@ -227,7 +262,7 @@ fn EndpointView(version: RwSignal<String>, models: Models, combos: Combos) -> im
             </p>
         </div>
         <div class="card">
-            <h3><span>"❤️"</span>"Status"</h3>
+            <h3><span>{icon("activity")}</span>"Status"</h3>
             <div class="grid">
                 <div class="modelrow"><span class="muted">"Version"</span><b>{move || version.get()}</b></div>
                 <div class="modelrow"><span class="muted">"Provider models"</span>
@@ -247,7 +282,7 @@ fn EndpointView(version: RwSignal<String>, models: Models, combos: Combos) -> im
 fn ModelsView(models: Models, combos: Combos) -> impl IntoView {
     view! {
         <div class="card">
-            <h3><span>"🧩"</span>"Combos"</h3>
+            <h3><span>{icon("layers")}</span>"Combos"</h3>
             <div class="grid">
                 {move || combos.get().into_iter().map(|(name, strat, targets)| {
                     let cls = format!("chip {}", pretty_strategy(&strat));
@@ -264,7 +299,7 @@ fn ModelsView(models: Models, combos: Combos) -> impl IntoView {
             </div>
         </div>
         <div class="card">
-            <h3><span>"📦"</span>"Provider models"</h3>
+            <h3><span>{icon("box")}</span>"Provider models"</h3>
             <div class="grid">
                 {move || {
                     let cn: HashSet<String> = combos.get().into_iter().map(|c| c.0).collect();
@@ -320,7 +355,7 @@ fn ProvidersView() -> impl IntoView {
 
     view! {
         <div class="card">
-            <h3><span>"➕"</span>"Add provider"</h3>
+            <h3><span>{icon("plus")}</span>"Add provider"</h3>
             <div class="grid">
                 <div class="row">
                     <input class="input" placeholder="id (e.g. openai)" prop:value=move || nid.get()
@@ -470,7 +505,7 @@ fn ProviderCard(prov: Value, reload: Callback<()>) -> impl IntoView {
 
     view! {
         <div class="card">
-            <h3><span>"🧠"</span>{id.get_value()}</h3>
+            <h3><span>{icon("cpu")}</span>{id.get_value()}</h3>
             <div class="grid">
                 <div class="row">
                     <input class="input" prop:value=move || base_url.get()
@@ -591,7 +626,7 @@ fn UsageView() -> impl IntoView {
         {move || if tab.get() == "overview" {
             view! {
                 <div class="card">
-                    <h3><span>"📊"</span>"Overview"</h3>
+                    <h3><span>{icon("bar-chart")}</span>"Overview"</h3>
                     <div class="grid">
                         <div class="modelrow"><span class="muted">"Requests"</span>
                             <b>{move || summary.get().map(|s| s["totals"]["requests"].as_u64().unwrap_or(0)).unwrap_or(0).to_string()}</b></div>
@@ -744,7 +779,7 @@ fn ConsoleLogView() -> impl IntoView {
     view! {
         <div class="card">
             <div class="row" style="justify-content:space-between">
-                <h3 style="margin:0"><span>"🖥"</span>"Console log"</h3>
+                <h3 style="margin:0"><span>{icon("terminal")}</span>"Console log"</h3>
                 <div class="row">
                     <span class=move || if connected.get() { "badge ok" } else { "badge" }>
                         {move || if connected.get() { "● live" } else { "○ offline" }}
@@ -807,7 +842,7 @@ fn QuotaView() -> impl IntoView {
     view! {
         <div class="card">
             <div class="row" style="justify-content:space-between">
-                <h3 style="margin:0"><span>"📈"</span>"Provider quotas"</h3>
+                <h3 style="margin:0"><span>{icon("trending-up")}</span>"Provider quotas"</h3>
                 <button class="btn ghost" on:click=move |_| load()>"Refresh"</button>
             </div>
             <p class="muted" style="margin:6px 0 0">
@@ -920,7 +955,7 @@ fn Playground(models: Models, combos: Combos) -> impl IntoView {
 
     view! {
         <div class="card">
-            <h3><span>"▶"</span>"Playground"</h3>
+            <h3><span>{icon("play")}</span>"Playground"</h3>
             <div class="grid">
                 <select class="input" on:change=move |e| model.set(event_target_value(&e))>
                     <option value="">"— pick a model or combo —"</option>

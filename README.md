@@ -1,12 +1,12 @@
 <div align="center">
 
-# 9Router — Agentic Orchestrator (Aggregator)
+# M Y C — Agentic Orchestrator (Aggregator)
 
 **v0.0.1 · Rust rewrite**
 
 </div>
 
-9Router is being migrated from a Node/Next.js router/proxy into a Rust **agentic
+M Y C is being migrated from a Node/Next.js router/proxy into a Rust **agentic
 orchestrator**: instead of forwarding a request 1:1 to one provider, the
 orchestrator *aggregates* across many providers using strategies — **fallback**,
 **round-robin**, and **fusion** (fan-out to a panel + judge synthesis).
@@ -46,33 +46,35 @@ targets = [{ provider = "openai", model = "gpt-4o-mini" }, ...]
 # core tests (fallback / round-robin / fusion)
 cargo test -p aggregator
 
-# backend (defaults to :20129; honors CONFIG_PATH)
+# backend (defaults to :20127; honors CONFIG_PATH) — also serves the dashboard
 export OPENAI_API_KEY=sk-...
 cargo run -p backend
+# → dashboard at http://localhost:20127/dashboard
 
-# frontend (Leptos) — needs trunk + the wasm32 target
+# frontend (Leptos) — build the dashboard the backend serves, or hot-reload it
 cargo install trunk
-cd crates/frontend && trunk serve   # dev UI on :8080, proxies the API to the backend
+cd crates/frontend && trunk build        # emits dist/ served at /dashboard
+cd crates/frontend && trunk serve        # dev UI on :8080, proxies the API to the backend
 ```
 
 ### API
 
 ```bash
-curl localhost:20129/v1/models
-curl -N -X POST localhost:20129/v1/chat/completions \
+curl localhost:20127/v1/models
+curl -N -X POST localhost:20127/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{"model":"free-fallback","messages":[{"role":"user","content":"hi"}],"stream":true}'
 ```
 
-The response carries `x_9router_target` (the provider/model that answered) and
-`x_9router_fused` (true when synthesized by a fusion judge).
+The response carries `x_myc_target` (the provider/model that answered) and
+`x_myc_fused` (true when synthesized by a fusion judge).
 
 ## Status / scope
 
 Done in this slice: the orchestrator (all three strategies, unit-tested), the
 Axum backend (streaming OpenAI-compatible API), and a Leptos frontend.
 
-Deferred (tracked): SQLite/DB, OAuth + the dashboard routes, cross-format
+Deferred (tracked): SQLite/DB, OAuth + auth-gated dashboard routes, cross-format
 translation (Claude/Gemini), RTK/token-savers, per-provider executors beyond
 OpenAI-compatible. The legacy Node app under `legacy/` remains the reference.
 

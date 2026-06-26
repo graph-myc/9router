@@ -1,15 +1,18 @@
 [build]
 target = "index.html"
+# The dashboard is served under /dashboard by the backend, so emitted asset
+# URLs must be prefixed accordingly.
+public_url = "/dashboard/"
 
 [serve]
 port = 8080
 # Proxy API calls to the running backend during `trunk serve`.
 
 [[proxy]]
-backend = "http://localhost:20129/v1"
+backend = "http://localhost:20127/v1"
 
 [[proxy]]
-backend = "http://localhost:20129/health"
+backend = "http://localhost:20127/health"
 
 [[proxy]]
-backend = "http://localhost:20129/version"
+backend = "http://localhost:20127/version"

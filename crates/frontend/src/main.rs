@@ -91,11 +91,23 @@ fn App() -> impl IntoView {
                 <div class="content">
                     {move || match view.get().as_str() {
                         "providers" => view! { <ProvidersView/> }.into_any(),
+                        "nodes" => view! { <PlaceholderView title="Provider Nodes" note="Custom OpenAI/Anthropic-compatible endpoints (validate + per-node config). Phase F."/> }.into_any(),
+                        "models" => view! { <ModelsView models=models combos=combos/> }.into_any(),
+                        "combos" => view! { <PlaceholderView title="Combos" note="Dedicated combo editor: drag-reorder, strategy, capability badges. Phase D. For now see Models."/> }.into_any(),
+                        "playground" => view! { <Playground models=models combos=combos/> }.into_any(),
+                        "media" => view! { <PlaceholderView title="Media Providers" note="Web search, web fetch, image, TTS and STT providers. Phase H."/> }.into_any(),
                         "usage" => view! { <UsageView/> }.into_any(),
                         "quota" => view! { <QuotaView/> }.into_any(),
                         "console" => view! { <ConsoleLogView/> }.into_any(),
-                        "models" => view! { <ModelsView models=models combos=combos/> }.into_any(),
-                        "playground" => view! { <Playground models=models combos=combos/> }.into_any(),
+                        "translator" => view! { <PlaceholderView title="Translator" note="7-step request/response inspector across OpenAI/Claude/Gemini formats. Phase J."/> }.into_any(),
+                        "proxy" => view! { <PlaceholderView title="Proxy Pools" note="Outbound proxy pools, connectivity tests and edge deploy. Phase I."/> }.into_any(),
+                        "cli" => view! { <PlaceholderView title="CLI Tools" note="Per-tool settings (OpenCode, Kilo, Codex, Droid…) and machine id. Phase K."/> }.into_any(),
+                        "mitm" => view! { <PlaceholderView title="MITM" note="Man-in-the-middle debugging proxy and alias map. Phase L."/> }.into_any(),
+                        "skills" => view! { <PlaceholderView title="Skills" note="Skill registry display and copy URLs. Phase K."/> }.into_any(),
+                        "keys" => view! { <PlaceholderView title="API Keys" note="Create and revoke API keys (backend /api/keys is ready). Phase C."/> }.into_any(),
+                        "pricing" => view! { <PlaceholderView title="Pricing" note="Per-model pricing and cost in usage analytics. Phase E."/> }.into_any(),
+                        "settings" => view! { <PlaceholderView title="Settings" note="Auth, default strategy, outbound proxy, DB export/import, theme, locale. Phase C."/> }.into_any(),
+                        "profile" => view! { <PlaceholderView title="Profile" note="Password change, theme, locale, version/update, shutdown. Phase C/K."/> }.into_any(),
                         _ => view! { <EndpointView version=version models=models combos=combos/> }.into_any(),
                     }}
                 </div>
@@ -106,43 +118,43 @@ fn App() -> impl IntoView {
 
 #[component]
 fn Sidebar(view: RwSignal<String>) -> impl IntoView {
+    let item = move |key: &'static str, icon: &'static str, label: &'static str| {
+        view! {
+            <button class="navitem" class:active=move || view.get() == key
+                on:click=move |_| view.set(key.to_string())>
+                <span class="ic">{icon}</span><span>{label}</span>
+            </button>
+        }
+    };
     view! {
         <aside class="sidebar">
             <div class="brand">
                 <div class="logo">"✦"</div>
                 <div><h1>"M Y C"</h1><small>"Aggregator · v0.0.2"</small></div>
             </div>
-            <button class="navitem" class:active=move || view.get() == "endpoint"
-                on:click=move |_| view.set("endpoint".to_string())>
-                <span class="ic">"🔌"</span><span>"Endpoint"</span>
-            </button>
-            <button class="navitem" class:active=move || view.get() == "providers"
-                on:click=move |_| view.set("providers".to_string())>
-                <span class="ic">"🧠"</span><span>"Providers"</span>
-            </button>
-            <button class="navitem" class:active=move || view.get() == "models"
-                on:click=move |_| view.set("models".to_string())>
-                <span class="ic">"📦"</span><span>"Models & Combos"</span>
-            </button>
-            <button class="navitem" class:active=move || view.get() == "playground"
-                on:click=move |_| view.set("playground".to_string())>
-                <span class="ic">"▶"</span><span>"Playground"</span>
-            </button>
+            {item("endpoint", "🔌", "Endpoint")}
+            {item("providers", "🧠", "Providers")}
+            {item("nodes", "🛰", "Provider Nodes")}
+            {item("models", "📦", "Models")}
+            {item("combos", "🧩", "Combos")}
+            {item("playground", "▶", "Playground")}
+            <div class="navgroup">"Media"</div>
+            {item("media", "🎙", "Media Providers")}
+            <div class="navgroup">"Monitoring"</div>
+            {item("usage", "📊", "Usage")}
+            {item("quota", "📈", "Quota")}
+            {item("console", "🖥", "Console Log")}
+            <div class="navgroup">"Tools"</div>
+            {item("translator", "🔁", "Translator")}
+            {item("proxy", "🌐", "Proxy Pools")}
+            {item("cli", "🧰", "CLI Tools")}
+            {item("mitm", "🕵", "MITM")}
+            {item("skills", "✨", "Skills")}
             <div class="navgroup">"System"</div>
-            <button class="navitem" class:active=move || view.get() == "usage"
-                on:click=move |_| view.set("usage".to_string())>
-                <span class="ic">"📊"</span><span>"Usage"</span>
-            </button>
-            <button class="navitem" class:active=move || view.get() == "quota"
-                on:click=move |_| view.set("quota".to_string())>
-                <span class="ic">"📈"</span><span>"Quota"</span>
-            </button>
-            <button class="navitem" class:active=move || view.get() == "console"
-                on:click=move |_| view.set("console".to_string())>
-                <span class="ic">"🖥"</span><span>"Console Log"</span>
-            </button>
-            <button class="navitem" disabled=true><span class="ic">"🔑"</span><span>"API Keys"</span></button>
-            <button class="navitem" disabled=true><span class="ic">"⚙"</span><span>"Settings"</span></button>
+            {item("keys", "🔑", "API Keys")}
+            {item("pricing", "💲", "Pricing")}
+            {item("settings", "⚙", "Settings")}
+            {item("profile", "👤", "Profile")}
         </aside>
     }
 }
@@ -151,11 +163,23 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
 fn Topbar(view: RwSignal<String>, version: RwSignal<String>) -> impl IntoView {
     let title = move || match view.get().as_str() {
         "providers" => "Providers",
+        "nodes" => "Provider Nodes",
+        "models" => "Models",
+        "combos" => "Combos",
+        "playground" => "Playground",
+        "media" => "Media Providers",
         "usage" => "Usage",
         "quota" => "Quota",
         "console" => "Console Log",
-        "models" => "Models & Combos",
-        "playground" => "Playground",
+        "translator" => "Translator",
+        "proxy" => "Proxy Pools",
+        "cli" => "CLI Tools",
+        "mitm" => "MITM",
+        "skills" => "Skills",
+        "keys" => "API Keys",
+        "pricing" => "Pricing",
+        "settings" => "Settings",
+        "profile" => "Profile",
         _ => "Endpoint",
     };
     view! {
@@ -168,6 +192,19 @@ fn Topbar(view: RwSignal<String>, version: RwSignal<String>) -> impl IntoView {
                 <span class="badge">{move || format!("v{}", version.get())}</span>
                 <span class="badge ok">"● online"</span>
             </div>
+        </div>
+    }
+}
+
+#[component]
+fn PlaceholderView(title: &'static str, note: &'static str) -> impl IntoView {
+    view! {
+        <div class="card">
+            <h3><span>"🚧"</span>{title}</h3>
+            <p class="muted" style="margin:8px 0 0">{note}</p>
+            <p class="muted" style="margin:6px 0 0">
+                "Part of the Mycelix migration — not implemented yet. Compare with the legacy app on :20129."
+            </p>
         </div>
     }
 }

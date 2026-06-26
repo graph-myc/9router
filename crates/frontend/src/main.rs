@@ -6,6 +6,8 @@ use leptos::task::spawn_local;
 use futures::StreamExt;
 use serde_json::Value;
 use std::collections::HashSet;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 
 const API_BASE: &str = "http://localhost:20130/v1";
@@ -24,6 +26,26 @@ fn pretty_strategy(s: &str) -> String {
     s.replace('_', "-")
 }
 
+/// Map the URL hash (e.g. `#/providers`) to a view key. Empty hash → `endpoint`.
+fn hash_to_view() -> String {
+    let raw = web_sys::window()
+        .and_then(|w| w.location().hash().ok())
+        .unwrap_or_default();
+    let key = raw.trim_start_matches('#').trim_start_matches('/');
+    if key.is_empty() {
+        "endpoint".to_string()
+    } else {
+        key.to_string()
+    }
+}
+
+/// Push a view key into the URL hash (`#/<key>`) so routes are linkable.
+fn go_to(key: &str) {
+    if let Some(w) = web_sys::window() {
+        let _ = w.location().set_hash(&format!("/{key}"));
+    }
+}
+
 /// Inline SVG icon (Lucide, MIT) rendered at `currentColor` — crisp, offline, no emoji.
 fn icon(name: &str) -> impl IntoView {
     let inner = match name {
@@ -36,6 +58,7 @@ fn icon(name: &str) -> impl IntoView {
         "mic" => r#"<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>"#,
         "bar-chart" => r#"<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>"#,
         "trending-up" => r#"<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>"#,
+        "target" => r#"<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>"#,
         "terminal" => r#"<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>"#,
         "languages" => r#"<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>"#,
         "globe" => r#"<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>"#,
@@ -61,10 +84,18 @@ fn icon(name: &str) -> impl IntoView {
 
 #[component]
 fn App() -> impl IntoView {
-    let view = RwSignal::new("endpoint".to_string());
+    let view = RwSignal::new(hash_to_view());
     let version = RwSignal::new("…".to_string());
     let models: Models = RwSignal::new(Vec::new());
     let combos: Combos = RwSignal::new(Vec::new());
+
+    // Keep the active view in sync with the URL hash so #/providers etc. are
+    // linkable and the browser back/forward buttons work.
+    if let Some(w) = web_sys::window() {
+        let cb = Closure::<dyn FnMut()>::new(move || view.set(hash_to_view()));
+        let _ = w.add_event_listener_with_callback("hashchange", cb.as_ref().unchecked_ref());
+        cb.forget();
+    }
 
     spawn_local(async move {
         if let Some(v) = fetch_json("/version").await {
@@ -156,7 +187,7 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
     let item = move |key: &'static str, ic: &'static str, label: &'static str| {
         view! {
             <button class="navitem" class:active=move || view.get() == key
-                on:click=move |_| view.set(key.to_string())>
+                on:click=move |_| { go_to(key); view.set(key.to_string()); }>
                 <span class="ic">{icon(ic)}</span><span>{label}</span>
             </button>
         }
@@ -639,7 +670,7 @@ fn UsageView() -> impl IntoView {
                     </div>
                 </div>
                 <div class="card">
-                    <h3><span>"🎯"</span>"By target"</h3>
+                    <h3><span>{icon("target")}</span>"By target"</h3>
                     <div class="grid">
                         {move || {
                             let rows = summary.get().and_then(|s| s["by_target"].as_array().cloned()).unwrap_or_default();

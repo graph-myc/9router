@@ -3,7 +3,7 @@
 # Edit the providers below to your own OpenAI-compatible endpoints.
 
 [server]
-port = 20127
+port = 20130
 
 # ---- Providers (any OpenAI-compatible /chat/completions endpoint) ----
 

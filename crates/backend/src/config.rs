@@ -1,7 +1,7 @@
 //! Seed configuration loaded from `config.toml` on first run. After that the
 //! mutable state lives in `state.json` (see state.rs).
 
-use aggregator::{Combo, FusionConfig, Strategy, Target};
+use myc_core::{Combo, FusionConfig, Strategy, Target};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
@@ -27,7 +27,7 @@ impl Default for ServerCfg {
 }
 
 fn default_port() -> u16 {
-    20127
+    20130
 }
 
 #[derive(Debug, Deserialize)]

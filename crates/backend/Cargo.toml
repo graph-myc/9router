@@ -1,16 +1,16 @@
 [package]
-name = "backend"
+name = "myc-node"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "9Router backend — Axum HTTP server hosting the agentic orchestrator"
+description = "Mycelix backend — Axum HTTP server hosting the agentic orchestrator"
 
 [[bin]]
-name = "backend"
+name = "myc"
 path = "src/main.rs"
 
 [dependencies]
-aggregator = { path = "../aggregator" }
+myc-core = { path = "../aggregator" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "signal"] }
 serde.workspace = true
 serde_json.workspace = true

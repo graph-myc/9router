@@ -10,7 +10,7 @@ version = "0.0.1"
 edition = "2021"
 license = "MIT"
 authors = ["graph-myc"]
-description = "9Router — agentic orchestrator (Aggregator), Rust rewrite"
+description = "Mycelix — agentic orchestrator (Aggregator), Rust rewrite"
 
 # Disable debuginfo in dev builds: the host MSVC linker (VS2017) throws
 # LNK1318 (PDB FILE_SYSTEM error) when linking proc-macro dylibs (e.g. leptos_macro).

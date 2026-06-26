@@ -6,7 +6,7 @@ mod logbuf;
 mod provider_openai;
 mod state;
 
-use aggregator::{ChatChunk, ChatRequest, Combo, ProviderError};
+use myc_core::{ChatChunk, ChatRequest, Combo, ProviderError};
 use axum::{
     extract::{Path, Query, Request, State},
     http::StatusCode,
@@ -199,7 +199,7 @@ async fn test_provider(
     };
     let req = ChatRequest {
         model: format!("{}/{}", p.id, model),
-        messages: vec![aggregator::ChatMessage { role: "user".into(), content: "ping".into() }],
+        messages: vec![myc_core::ChatMessage { role: "user".into(), content: "ping".into() }],
         max_tokens: Some(1),
         ..Default::default()
     };

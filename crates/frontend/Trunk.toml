@@ -9,10 +9,10 @@ port = 8080
 # Proxy API calls to the running backend during `trunk serve`.
 
 [[proxy]]
-backend = "http://localhost:20127/v1"
+backend = "http://localhost:20130/v1"
 
 [[proxy]]
-backend = "http://localhost:20127/health"
+backend = "http://localhost:20130/health"
 
 [[proxy]]
-backend = "http://localhost:20127/version"
+backend = "http://localhost:20130/version"

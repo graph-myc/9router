@@ -1,12 +1,12 @@
 [package]
-name = "frontend"
+name = "myc-web"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "M Y C frontend — Leptos (CSR) dashboard for the aggregator"
+description = "Mycelix frontend — Leptos (CSR) dashboard for the aggregator"
 
 [[bin]]
-name = "frontend"
+name = "myc-web"
 path = "src/main.rs"
 
 [dependencies]

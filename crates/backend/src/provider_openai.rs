@@ -2,7 +2,7 @@
 //! One client type covers OpenAI, GLM, OpenRouter, Groq, etc.
 
 use crate::state::{now_ts, QuotaMap, QuotaSnapshot};
-use aggregator::{
+use myc_core::{
     ChatChunk, ChatRequest, ChatResponse, ChatStream, ModelInfo, Provider, ProviderError, Usage,
 };
 use async_trait::async_trait;

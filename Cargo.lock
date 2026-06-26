@@ -3,19 +3,6 @@
 version = 4
 
 [[package]]
-name = "aggregator"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "futures",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -171,26 +158,6 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "backend"
-version = "0.0.1"
-dependencies = [
- "aggregator",
- "async-stream",
- "async-trait",
- "axum",
- "futures",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "toml 0.8.23",
- "tower-http",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -459,21 +426,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
-]
-
-[[package]]
-name = "frontend"
-version = "0.0.1"
-dependencies = [
- "console_error_panic_hook",
- "futures",
- "gloo-net",
- "js-sys",
- "leptos",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1191,6 +1143,54 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "myc-core"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "myc-node"
+version = "0.0.1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "axum",
+ "futures",
+ "myc-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 0.8.23",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "myc-web"
+version = "0.0.1"
+dependencies = [
+ "console_error_panic_hook",
+ "futures",
+ "gloo-net",
+ "js-sys",
+ "leptos",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

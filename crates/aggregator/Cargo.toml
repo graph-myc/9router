@@ -1,9 +1,9 @@
 [package]
-name = "aggregator"
+name = "myc-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "9Router agentic orchestrator core: provider trait + fallback / round-robin / fusion strategies"
+description = "Mycelix orchestrator core: provider trait + fallback / round-robin / fusion strategies"
 
 [dependencies]
 tokio.workspace = true

@@ -3,7 +3,7 @@
 //! whenever providers/combos change.
 
 use crate::provider_openai::OpenAiCompatibleProvider;
-use aggregator::{Combo, ModelInfo, Orchestrator, Provider};
+use myc_core::{Combo, ModelInfo, Orchestrator, Provider};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;

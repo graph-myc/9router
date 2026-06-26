@@ -1,12 +1,12 @@
 <div align="center">
 
-# M Y C — Agentic Orchestrator (Aggregator)
+# Mycelix — Agentic Orchestrator (Aggregator)
 
 **v0.0.1 · Rust rewrite**
 
 </div>
 
-M Y C is being migrated from a Node/Next.js router/proxy into a Rust **agentic
+Mycelix (UI wordmark **M Y C**) is being migrated from a Node/Next.js router/proxy into a Rust **agentic
 orchestrator**: instead of forwarding a request 1:1 to one provider, the
 orchestrator *aggregates* across many providers using strategies — **fallback**,
 **round-robin**, and **fusion** (fan-out to a panel + judge synthesis).
@@ -18,9 +18,9 @@ archived, intact, under [`legacy/`](./legacy).
 
 | Crate | Module | Responsibility |
 |-------|--------|----------------|
-| [`crates/aggregator`](./crates/aggregator) | core | `Provider` trait + `Orchestrator` (fallback / round-robin / fusion). Pure, no HTTP. |
-| [`crates/backend`](./crates/backend) | **backend** | Axum server: `/health`, `/version`, `/v1/models`, streaming `/v1/chat/completions`. `OpenAiCompatibleProvider` (reqwest). |
-| [`crates/frontend`](./crates/frontend) | **frontend** | Leptos (CSR) status + test UI. |
+| [`crates/aggregator`](./crates/aggregator) | **myc-core** | `Provider` trait + `Orchestrator` (fallback / round-robin / fusion). Pure, no HTTP. |
+| [`crates/backend`](./crates/backend) | **myc-node** | Axum server: `/health`, `/version`, `/v1/models`, streaming `/v1/chat/completions`. `OpenAiCompatibleProvider` (reqwest). Binary: `myc`. |
+| [`crates/frontend`](./crates/frontend) | **myc-web** | Leptos (CSR) status + test UI. |
 
 ## Configure
 
@@ -44,12 +44,12 @@ targets = [{ provider = "openai", model = "gpt-4o-mini" }, ...]
 
 ```bash
 # core tests (fallback / round-robin / fusion)
-cargo test -p aggregator
+cargo test -p myc-core
 
-# backend (defaults to :20127; honors CONFIG_PATH) — also serves the dashboard
+# backend (defaults to :20130; honors CONFIG_PATH) — also serves the dashboard
 export OPENAI_API_KEY=sk-...
-cargo run -p backend
-# → dashboard at http://localhost:20127/dashboard
+cargo run -p myc-node
+# → dashboard at http://localhost:20130/dashboard
 
 # frontend (Leptos) — build the dashboard the backend serves, or hot-reload it
 cargo install trunk

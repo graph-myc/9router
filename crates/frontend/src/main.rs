@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 use wasm_bindgen::JsValue;
 
-const API_BASE: &str = "http://localhost:20127/v1";
+const API_BASE: &str = "http://localhost:20130/v1";
 
 /// (id, name)
 type Models = RwSignal<Vec<(String, String)>>;

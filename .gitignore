@@ -11,6 +11,9 @@ Cargo.lock.bak
 .env
 *.local
 
+# Runtime state (may contain provider API keys)
+/state.json
+
 # Legacy JS runtime leftovers (archived app lives in /legacy)
 /node_modules
 /.next

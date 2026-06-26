@@ -6,7 +6,7 @@ members = ["crates/aggregator", "crates/backend", "crates/frontend"]
 default-members = ["crates/aggregator", "crates/backend"]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 license = "MIT"
 authors = ["graph-myc"]

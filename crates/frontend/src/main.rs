@@ -110,7 +110,7 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
         <aside class="sidebar">
             <div class="brand">
                 <div class="logo">"✦"</div>
-                <div><h1>"M Y C"</h1><small>"Aggregator · v0.0.1"</small></div>
+                <div><h1>"M Y C"</h1><small>"Aggregator · v0.0.2"</small></div>
             </div>
             <button class="navitem" class:active=move || view.get() == "endpoint"
                 on:click=move |_| view.set("endpoint".to_string())>

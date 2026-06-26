@@ -1147,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "myc-core"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-trait",
  "futures",
@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "myc-node"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "myc-web"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "console_error_panic_hook",
  "futures",

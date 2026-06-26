@@ -2,7 +2,7 @@
 
 # Mycelix — Agentic Orchestrator (Aggregator)
 
-**v0.0.1 · Rust rewrite**
+**v0.0.2 · Rust rewrite**
 
 </div>
 

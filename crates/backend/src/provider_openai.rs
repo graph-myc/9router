@@ -1,6 +1,7 @@
 //! Concrete provider: any OpenAI-compatible `/chat/completions` endpoint.
 //! One client type covers OpenAI, GLM, OpenRouter, Groq, etc.
 
+use crate::state::{now_ts, QuotaMap, QuotaSnapshot};
 use aggregator::{
     ChatChunk, ChatRequest, ChatResponse, ChatStream, ModelInfo, Provider, ProviderError, Usage,
 };
@@ -12,17 +13,49 @@ pub struct OpenAiCompatibleProvider {
     base_url: String,
     api_key: String,
     models: Vec<ModelInfo>,
+    quota: QuotaMap,
     client: reqwest::Client,
 }
 
 impl OpenAiCompatibleProvider {
-    pub fn new(id: String, base_url: String, api_key: String, models: Vec<ModelInfo>) -> Self {
+    pub fn new(
+        id: String,
+        base_url: String,
+        api_key: String,
+        models: Vec<ModelInfo>,
+        quota: QuotaMap,
+    ) -> Self {
         Self {
             id,
             base_url,
             api_key,
             models,
+            quota,
             client: reqwest::Client::new(),
+        }
+    }
+
+    /// Capture rate-limit headers (OpenAI-style) into the shared quota map.
+    fn capture_quota(&self, headers: &reqwest::header::HeaderMap, status: u16) {
+        let g = |k: &str| {
+            headers
+                .get(k)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        };
+        let gu = |k: &str| g(k).and_then(|s| s.parse::<u64>().ok());
+        let snap = QuotaSnapshot {
+            limit_requests: gu("x-ratelimit-limit-requests"),
+            remaining_requests: gu("x-ratelimit-remaining-requests"),
+            limit_tokens: gu("x-ratelimit-limit-tokens"),
+            remaining_tokens: gu("x-ratelimit-remaining-tokens"),
+            reset: g("x-ratelimit-reset-requests").or_else(|| g("x-ratelimit-reset-tokens")),
+            retry_after: g("retry-after"),
+            last_status: status,
+            updated: now_ts(),
+        };
+        if let Ok(mut m) = self.quota.lock() {
+            m.insert(self.id.clone(), snap);
         }
     }
 
@@ -72,6 +105,7 @@ impl Provider for OpenAiCompatibleProvider {
             .map_err(|e| ProviderError::Network(e.to_string()))?;
 
         let status = resp.status();
+        self.capture_quota(resp.headers(), status.as_u16());
         if !status.is_success() {
             let msg = resp.text().await.unwrap_or_default();
             return Err(ProviderError::Http {
@@ -118,6 +152,7 @@ impl Provider for OpenAiCompatibleProvider {
             .map_err(|e| ProviderError::Network(e.to_string()))?;
 
         let status = resp.status();
+        self.capture_quota(resp.headers(), status.as_u16());
         if !status.is_success() {
             let msg = resp.text().await.unwrap_or_default();
             return Err(ProviderError::Http {

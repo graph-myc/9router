@@ -92,6 +92,7 @@ fn App() -> impl IntoView {
                     {move || match view.get().as_str() {
                         "providers" => view! { <ProvidersView/> }.into_any(),
                         "usage" => view! { <UsageView/> }.into_any(),
+                        "quota" => view! { <QuotaView/> }.into_any(),
                         "console" => view! { <ConsoleLogView/> }.into_any(),
                         "models" => view! { <ModelsView models=models combos=combos/> }.into_any(),
                         "playground" => view! { <Playground models=models combos=combos/> }.into_any(),
@@ -132,6 +133,10 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
                 on:click=move |_| view.set("usage".to_string())>
                 <span class="ic">"📊"</span><span>"Usage"</span>
             </button>
+            <button class="navitem" class:active=move || view.get() == "quota"
+                on:click=move |_| view.set("quota".to_string())>
+                <span class="ic">"📈"</span><span>"Quota"</span>
+            </button>
             <button class="navitem" class:active=move || view.get() == "console"
                 on:click=move |_| view.set("console".to_string())>
                 <span class="ic">"🖥"</span><span>"Console Log"</span>
@@ -147,6 +152,7 @@ fn Topbar(view: RwSignal<String>, version: RwSignal<String>) -> impl IntoView {
     let title = move || match view.get().as_str() {
         "providers" => "Providers",
         "usage" => "Usage",
+        "quota" => "Quota",
         "console" => "Console Log",
         "models" => "Models & Combos",
         "playground" => "Playground",
@@ -723,6 +729,119 @@ fn ConsoleLogView() -> impl IntoView {
                     }
                 }}
             </pre>
+        </div>
+    }
+}
+
+/// A small usage-vs-limit progress bar.
+fn quota_bar(label: &str, used: u64, limit: u64) -> impl IntoView {
+    let pct = if limit > 0 {
+        ((used as f64 / limit as f64) * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+    let danger = pct >= 90.0;
+    let fill = if danger { "#ff6b6b" } else { "var(--accent)" };
+    view! {
+        <div style="margin-top:6px">
+            <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)">
+                <span>{label.to_string()}</span>
+                <span>{format!("{used} / {limit}")}</span>
+            </div>
+            <div style="height:8px;background:#0e0e0f;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-top:3px">
+                <div style=format!("height:100%;width:{pct:.0}%;background:{fill}")></div>
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn QuotaView() -> impl IntoView {
+    let rows: RwSignal<Vec<Value>> = RwSignal::new(Vec::new());
+    let load = move || {
+        spawn_local(async move {
+            if let Some(v) = fetch_json("/api/quota").await {
+                rows.set(v["quota"].as_array().cloned().unwrap_or_default());
+            }
+        });
+    };
+    load();
+
+    view! {
+        <div class="card">
+            <div class="row" style="justify-content:space-between">
+                <h3 style="margin:0"><span>"📈"</span>"Provider quotas"</h3>
+                <button class="btn ghost" on:click=move |_| load()>"Refresh"</button>
+            </div>
+            <p class="muted" style="margin:6px 0 0">
+                "Rate-limit headers are captured from upstream responses; 24h usage is computed from the request log."
+            </p>
+            <div class="grid" style="margin-top:14px">
+                {move || {
+                    let rs = rows.get();
+                    if rs.is_empty() {
+                        return view! {
+                            <span class="muted">"No providers configured."</span>
+                        }.into_any();
+                    }
+                    rs.into_iter().map(|q| {
+                        let id = q["id"].as_str().unwrap_or("").to_string();
+                        let reqs = q["requests_24h"].as_u64().unwrap_or(0);
+                        let toks = q["tokens_24h"].as_u64().unwrap_or(0);
+                        let status = q["last_status"].as_u64().unwrap_or(0);
+                        let retry = q["retry_after"].as_str().unwrap_or("").to_string();
+                        let req_bar = match (
+                            q["limit_requests"].as_u64(),
+                            q["remaining_requests"].as_u64(),
+                        ) {
+                            (Some(l), Some(r)) if l > 0 => {
+                                Some(quota_bar("requests", l.saturating_sub(r), l))
+                            }
+                            _ => None,
+                        };
+                        let tok_bar = match (
+                            q["limit_tokens"].as_u64(),
+                            q["remaining_tokens"].as_u64(),
+                        ) {
+                            (Some(l), Some(r)) if l > 0 => {
+                                Some(quota_bar("tokens", l.saturating_sub(r), l))
+                            }
+                            _ => None,
+                        };
+                        let no_limits = req_bar.is_none() && tok_bar.is_none();
+                        let (badge_cls, badge_txt) = if status == 0 {
+                            ("chip", "idle".to_string())
+                        } else if status >= 400 {
+                            ("chip fallback", format!("HTTP {status}"))
+                        } else {
+                            ("chip round-robin", format!("HTTP {status}"))
+                        };
+                        view! {
+                            <div class="card" style="background:#0f0f10">
+                                <div class="row" style="justify-content:space-between">
+                                    <b>{id}</b>
+                                    <span class=badge_cls>{badge_txt}</span>
+                                </div>
+                                <div class="muted" style="font-size:12.5px;margin-top:4px">
+                                    {format!("24h: {reqs} requests · {toks} tokens")}
+                                </div>
+                                {req_bar}
+                                {tok_bar}
+                                {no_limits.then(|| view! {
+                                    <div class="muted" style="font-size:11.5px;margin-top:6px">
+                                        "No rate-limit headers seen yet."
+                                    </div>
+                                })}
+                                {(!retry.is_empty()).then(|| view! {
+                                    <div style="font-size:11.5px;margin-top:6px;color:#f0c050">
+                                        {format!("retry-after: {retry}")}
+                                    </div>
+                                })}
+                            </div>
+                        }
+                    }).collect_view().into_any()
+                }}
+            </div>
         </div>
     }
 }

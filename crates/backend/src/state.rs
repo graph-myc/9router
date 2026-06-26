@@ -7,7 +7,7 @@ use aggregator::{Combo, ModelInfo, Orchestrator, Provider};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -58,6 +58,22 @@ pub struct LogEntry {
 }
 
 const MAX_LOG: usize = 5000;
+
+/// Latest rate-limit signals captured from a provider's HTTP responses. Runtime
+/// only (not persisted).
+#[derive(Clone, Default, Serialize)]
+pub struct QuotaSnapshot {
+    pub limit_requests: Option<u64>,
+    pub remaining_requests: Option<u64>,
+    pub limit_tokens: Option<u64>,
+    pub remaining_tokens: Option<u64>,
+    pub reset: Option<String>,
+    pub retry_after: Option<String>,
+    pub last_status: u16,
+    pub updated: u64,
+}
+
+pub type QuotaMap = Arc<Mutex<HashMap<String, QuotaSnapshot>>>;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct StoredState {
@@ -119,6 +135,7 @@ struct Inner {
 pub struct AppState {
     path: PathBuf,
     inner: RwLock<Inner>,
+    quota: QuotaMap,
 }
 
 fn now() -> u64 {
@@ -128,7 +145,12 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
-fn build_orch(stored: &StoredState) -> Arc<Orchestrator> {
+/// Public epoch-seconds helper (used by the provider client for quota stamps).
+pub fn now_ts() -> u64 {
+    now()
+}
+
+fn build_orch(stored: &StoredState, quota: &QuotaMap) -> Arc<Orchestrator> {
     let mut providers: Vec<Arc<dyn Provider>> = Vec::new();
     for p in &stored.providers {
         let models = p
@@ -144,6 +166,7 @@ fn build_orch(stored: &StoredState) -> Arc<Orchestrator> {
             p.base_url.clone(),
             p.api_key.clone(),
             models,
+            quota.clone(),
         )));
     }
     Arc::new(Orchestrator::new(providers, stored.combos.clone()))
@@ -156,10 +179,12 @@ impl AppState {
             .ok()
             .and_then(|s| serde_json::from_str::<StoredState>(&s).ok())
             .unwrap_or(seed);
-        let orch = build_orch(&stored);
+        let quota: QuotaMap = Arc::new(Mutex::new(HashMap::new()));
+        let orch = build_orch(&stored, &quota);
         Self {
             path,
             inner: RwLock::new(Inner { stored, orch }),
+            quota,
         }
     }
 
@@ -195,9 +220,14 @@ impl AppState {
         let mut inner = self.inner.write().unwrap();
         f(&mut inner.stored);
         if rebuild {
-            inner.orch = build_orch(&inner.stored);
+            inner.orch = build_orch(&inner.stored, &self.quota);
         }
         self.save_locked(&inner);
+    }
+
+    /// Clone of the latest captured rate-limit snapshots, keyed by provider id.
+    pub fn quota_snapshot(&self) -> HashMap<String, QuotaSnapshot> {
+        self.quota.lock().unwrap().clone()
     }
 
     pub fn upsert_provider(&self, mut p: ProviderStored) {

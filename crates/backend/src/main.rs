@@ -69,6 +69,7 @@ async fn main() {
         .route("/usage/logs", get(get_usage_logs))
         .route("/console-logs/stream", get(console_logs_stream))
         .route("/console-logs", delete(clear_console_logs))
+        .route("/quota", get(get_quota))
         .route("/settings/require-key", put(set_require_key));
 
     // The Leptos dashboard (SPA) is served under /dashboard; unknown sub-paths
@@ -400,6 +401,45 @@ async fn console_logs_stream(Extension(buf): Extension<Arc<logbuf::LogBuffer>>) 
 async fn clear_console_logs(Extension(buf): Extension<Arc<logbuf::LogBuffer>>) -> Json<Value> {
     buf.clear();
     Json(json!({ "ok": true }))
+}
+
+// ---- quota (per-provider rate-limit + 24h usage) ----
+
+async fn get_quota(State(st): St) -> Json<Value> {
+    let s = st.snapshot();
+    let qmap = st.quota_snapshot();
+    let since = now_secs().saturating_sub(24 * 3600);
+    let rows: Vec<Value> = s
+        .providers
+        .iter()
+        .map(|p| {
+            let prefix = format!("{}/", p.id);
+            let (mut reqs, mut toks) = (0u64, 0u64);
+            for e in s
+                .request_log
+                .iter()
+                .filter(|e| e.ts >= since && e.target.starts_with(&prefix))
+            {
+                reqs += 1;
+                toks += e.prompt_tokens + e.completion_tokens;
+            }
+            let cap = qmap.get(&p.id);
+            json!({
+                "id": p.id,
+                "requests_24h": reqs,
+                "tokens_24h": toks,
+                "limit_requests": cap.and_then(|c| c.limit_requests),
+                "remaining_requests": cap.and_then(|c| c.remaining_requests),
+                "limit_tokens": cap.and_then(|c| c.limit_tokens),
+                "remaining_tokens": cap.and_then(|c| c.remaining_tokens),
+                "reset": cap.and_then(|c| c.reset.clone()),
+                "retry_after": cap.and_then(|c| c.retry_after.clone()),
+                "last_status": cap.map(|c| c.last_status).unwrap_or(0),
+                "updated": cap.map(|c| c.updated).unwrap_or(0),
+            })
+        })
+        .collect();
+    Json(json!({ "quota": rows }))
 }
 
 // ---- chat ----

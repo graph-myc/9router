@@ -2,6 +2,7 @@
 //! with provider/combo CRUD, API keys, and usage analytics (JSON-persisted).
 
 mod config;
+mod logbuf;
 mod provider_openai;
 mod state;
 
@@ -12,7 +13,7 @@ use axum::{
     middleware::{self, Next},
     response::{sse::Event, IntoResponse, Redirect, Response, Sse},
     routing::{delete, get, post, put},
-    Json, Router,
+    Extension, Json, Router,
 };
 use futures::StreamExt;
 use serde_json::{json, Value};
@@ -27,10 +28,15 @@ type St = State<Arc<AppState>>;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+    let log_buffer = Arc::new(logbuf::LogBuffer::new());
+    use tracing_subscriber::prelude::*;
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info".into()),
         )
+        .with(tracing_subscriber::fmt::layer())
+        .with(logbuf::BufferLayer { buf: log_buffer.clone() })
         .init();
 
     let cfg_path = std::env::var("CONFIG_PATH").unwrap_or_else(|_| "config.toml".to_string());
@@ -61,6 +67,8 @@ async fn main() {
         .route("/usage", get(get_usage))
         .route("/usage/summary", get(get_usage_summary))
         .route("/usage/logs", get(get_usage_logs))
+        .route("/console-logs/stream", get(console_logs_stream))
+        .route("/console-logs", delete(clear_console_logs))
         .route("/settings/require-key", put(set_require_key));
 
     // The Leptos dashboard (SPA) is served under /dashboard; unknown sub-paths
@@ -77,6 +85,7 @@ async fn main() {
         .nest("/api", api)
         .with_state(app_state)
         .nest_service("/dashboard", dashboard)
+        .layer(Extension(log_buffer.clone()))
         .layer(CorsLayer::permissive());
 
     let addr = format!("0.0.0.0:{port}");
@@ -362,6 +371,35 @@ async fn get_usage_logs(
         })
         .collect();
     Json(json!({ "logs": logs }))
+}
+
+// ---- console logs (live server log stream) ----
+
+async fn console_logs_stream(Extension(buf): Extension<Arc<logbuf::LogBuffer>>) -> Response {
+    let snapshot = buf.snapshot();
+    let mut rx = buf.subscribe();
+    let stream = async_stream::stream! {
+        let init = json!({ "type": "init", "logs": snapshot });
+        yield Ok::<Event, std::convert::Infallible>(Event::default().data(init.to_string()));
+        loop {
+            match rx.recv().await {
+                Ok(logbuf::LogMsg::Line(line)) => {
+                    yield Ok(Event::default().data(json!({ "type": "line", "line": line }).to_string()));
+                }
+                Ok(logbuf::LogMsg::Clear) => {
+                    yield Ok(Event::default().data(json!({ "type": "clear" }).to_string()));
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            }
+        }
+    };
+    Sse::new(stream).into_response()
+}
+
+async fn clear_console_logs(Extension(buf): Extension<Arc<logbuf::LogBuffer>>) -> Json<Value> {
+    buf.clear();
+    Json(json!({ "ok": true }))
 }
 
 // ---- chat ----

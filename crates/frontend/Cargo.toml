@@ -11,7 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 leptos = { version = "0.7", features = ["csr"] }
-gloo-net = "0.6"
+gloo-net = { version = "0.6", features = ["eventsource"] }
+futures = "0.3"
 serde.workspace = true
 serde_json.workspace = true
 wasm-bindgen = "0.2"

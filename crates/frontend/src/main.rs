@@ -3,6 +3,7 @@
 use gloo_net::http::Request;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use futures::StreamExt;
 use serde_json::Value;
 use std::collections::HashSet;
 use wasm_bindgen::JsValue;
@@ -91,6 +92,7 @@ fn App() -> impl IntoView {
                     {move || match view.get().as_str() {
                         "providers" => view! { <ProvidersView/> }.into_any(),
                         "usage" => view! { <UsageView/> }.into_any(),
+                        "console" => view! { <ConsoleLogView/> }.into_any(),
                         "models" => view! { <ModelsView models=models combos=combos/> }.into_any(),
                         "playground" => view! { <Playground models=models combos=combos/> }.into_any(),
                         _ => view! { <EndpointView version=version models=models combos=combos/> }.into_any(),
@@ -130,6 +132,10 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
                 on:click=move |_| view.set("usage".to_string())>
                 <span class="ic">"📊"</span><span>"Usage"</span>
             </button>
+            <button class="navitem" class:active=move || view.get() == "console"
+                on:click=move |_| view.set("console".to_string())>
+                <span class="ic">"🖥"</span><span>"Console Log"</span>
+            </button>
             <button class="navitem" disabled=true><span class="ic">"🔑"</span><span>"API Keys"</span></button>
             <button class="navitem" disabled=true><span class="ic">"⚙"</span><span>"Settings"</span></button>
         </aside>
@@ -141,6 +147,7 @@ fn Topbar(view: RwSignal<String>, version: RwSignal<String>) -> impl IntoView {
     let title = move || match view.get().as_str() {
         "providers" => "Providers",
         "usage" => "Usage",
+        "console" => "Console Log",
         "models" => "Models & Combos",
         "playground" => "Playground",
         _ => "Endpoint",
@@ -610,6 +617,113 @@ fn UsageView() -> impl IntoView {
                 </div>
             }.into_any()
         }}
+    }
+}
+
+fn log_style(line: &str) -> &'static str {
+    if line.starts_with("[ERROR]") {
+        "color:#ff6b6b"
+    } else if line.starts_with("[WARN]") {
+        "color:#f0c050"
+    } else if line.starts_with("[INFO]") {
+        "color:#6ea8fe"
+    } else if line.starts_with("[DEBUG]") {
+        "color:#c792ea"
+    } else {
+        "color:#5fd0a8"
+    }
+}
+
+#[component]
+fn ConsoleLogView() -> impl IntoView {
+    let logs: RwSignal<Vec<String>> = RwSignal::new(Vec::new());
+    let connected = RwSignal::new(false);
+    let pre_ref: NodeRef<leptos::html::Pre> = NodeRef::new();
+
+    // Open the SSE stream once on mount; keep the EventSource alive in the task.
+    if let Ok(mut es) = gloo_net::eventsource::futures::EventSource::new("/api/console-logs/stream")
+    {
+        if let Ok(mut sub) = es.subscribe("message") {
+            spawn_local(async move {
+                let _hold = es; // dropping would close the connection
+                while let Some(item) = sub.next().await {
+                    let Ok((_t, msg)) = item else { continue };
+                    let Some(data) = msg.data().as_string() else { continue };
+                    let Ok(v) = serde_json::from_str::<Value>(&data) else { continue };
+                    match v["type"].as_str() {
+                        Some("init") => {
+                            let lines: Vec<String> = v["logs"]
+                                .as_array()
+                                .cloned()
+                                .unwrap_or_default()
+                                .iter()
+                                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                .collect();
+                            logs.set(lines);
+                            connected.set(true);
+                        }
+                        Some("line") => {
+                            if let Some(l) = v["line"].as_str() {
+                                let l = l.to_string();
+                                logs.update(|ls| {
+                                    ls.push(l);
+                                    let n = ls.len();
+                                    if n > 1000 {
+                                        ls.drain(0..n - 1000);
+                                    }
+                                });
+                            }
+                            connected.set(true);
+                        }
+                        Some("clear") => logs.set(Vec::new()),
+                        _ => {}
+                    }
+                }
+                connected.set(false);
+            });
+        }
+    }
+
+    // Auto-scroll to the newest line.
+    Effect::new(move |_| {
+        let _ = logs.get();
+        if let Some(el) = pre_ref.get() {
+            el.set_scroll_top(el.scroll_height());
+        }
+    });
+
+    let clear = move |_| {
+        spawn_local(async move {
+            delete_req("/api/console-logs").await;
+        });
+    };
+
+    view! {
+        <div class="card">
+            <div class="row" style="justify-content:space-between">
+                <h3 style="margin:0"><span>"🖥"</span>"Console log"</h3>
+                <div class="row">
+                    <span class=move || if connected.get() { "badge ok" } else { "badge" }>
+                        {move || if connected.get() { "● live" } else { "○ offline" }}
+                    </span>
+                    <button class="btn ghost" on:click=clear>"Clear"</button>
+                </div>
+            </div>
+            <pre node_ref=pre_ref class="codeblock"
+                style="height:calc(100vh - 260px);max-height:none;margin-top:14px">
+                {move || {
+                    let ls = logs.get();
+                    if ls.is_empty() {
+                        view! { <span class="muted">"No console logs yet."</span> }.into_any()
+                    } else {
+                        ls.into_iter().map(|line| {
+                            let st = log_style(&line);
+                            view! { <div style=st>{line}</div> }
+                        }).collect_view().into_any()
+                    }
+                }}
+            </pre>
+        </div>
     }
 }
 

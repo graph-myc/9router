@@ -44,6 +44,21 @@ pub struct UsageRow {
     pub completion_tokens: u64,
 }
 
+/// One recorded request, kept in a capped ring for time-windowed analytics.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct LogEntry {
+    pub ts: u64,
+    pub target: String,
+    pub prompt_tokens: u64,
+    pub completion_tokens: u64,
+    #[serde(default)]
+    pub status: u16,
+    #[serde(default)]
+    pub stream: bool,
+}
+
+const MAX_LOG: usize = 5000;
+
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct StoredState {
     #[serde(default)]
@@ -56,6 +71,8 @@ pub struct StoredState {
     pub require_api_key: bool,
     #[serde(default)]
     pub usage: HashMap<String, UsageRow>,
+    #[serde(default)]
+    pub request_log: Vec<LogEntry>,
 }
 
 impl StoredState {
@@ -89,6 +106,7 @@ impl StoredState {
             api_keys: Vec::new(),
             require_api_key: false,
             usage: HashMap::new(),
+            request_log: Vec::new(),
         }
     }
 }
@@ -236,11 +254,35 @@ impl AppState {
     }
 
     pub fn record_usage(&self, key: &str, prompt: u64, completion: u64) {
+        self.record_request(key, prompt, completion, 200, false);
+    }
+
+    /// Record a request into both the aggregate counters and the time-series log.
+    pub fn record_request(
+        &self,
+        target: &str,
+        prompt: u64,
+        completion: u64,
+        status: u16,
+        stream: bool,
+    ) {
         self.mutate(false, |s| {
-            let row = s.usage.entry(key.to_string()).or_default();
+            let row = s.usage.entry(target.to_string()).or_default();
             row.requests += 1;
             row.prompt_tokens += prompt;
             row.completion_tokens += completion;
+            s.request_log.push(LogEntry {
+                ts: now(),
+                target: target.to_string(),
+                prompt_tokens: prompt,
+                completion_tokens: completion,
+                status,
+                stream,
+            });
+            let len = s.request_log.len();
+            if len > MAX_LOG {
+                s.request_log.drain(0..len - MAX_LOG);
+            }
         });
     }
 }

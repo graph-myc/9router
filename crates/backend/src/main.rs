@@ -7,7 +7,7 @@ mod state;
 
 use aggregator::{ChatChunk, ChatRequest, Combo, ProviderError};
 use axum::{
-    extract::{Path, Request, State},
+    extract::{Path, Query, Request, State},
     http::StatusCode,
     middleware::{self, Next},
     response::{sse::Event, IntoResponse, Redirect, Response, Sse},
@@ -59,6 +59,8 @@ async fn main() {
         .route("/keys", get(list_keys).post(create_key))
         .route("/keys/{id}", delete(delete_key))
         .route("/usage", get(get_usage))
+        .route("/usage/summary", get(get_usage_summary))
+        .route("/usage/logs", get(get_usage_logs))
         .route("/settings/require-key", put(set_require_key));
 
     // The Leptos dashboard (SPA) is served under /dashboard; unknown sub-paths
@@ -272,6 +274,24 @@ async fn set_require_key(State(st): St, Json(body): Json<Value>) -> Json<Value> 
 
 // ---- usage ----
 
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn period_since(period: &str) -> u64 {
+    let now = now_secs();
+    match period {
+        "24h" => now.saturating_sub(86_400),
+        "7d" => now.saturating_sub(7 * 86_400),
+        "30d" => now.saturating_sub(30 * 86_400),
+        "60d" => now.saturating_sub(60 * 86_400),
+        _ => now - (now % 86_400), // today (UTC midnight)
+    }
+}
+
 async fn get_usage(State(st): St) -> Json<Value> {
     let s = st.snapshot();
     let mut rows: Vec<_> = s
@@ -289,6 +309,61 @@ async fn get_usage(State(st): St) -> Json<Value> {
     Json(json!({ "usage": rows }))
 }
 
+async fn get_usage_summary(
+    State(st): St,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> Json<Value> {
+    let period = q.get("period").cloned().unwrap_or_else(|| "today".to_string());
+    let since = period_since(&period);
+    let s = st.snapshot();
+    let mut by: std::collections::HashMap<String, (u64, u64, u64)> = std::collections::HashMap::new();
+    let (mut reqs, mut pin, mut pout) = (0u64, 0u64, 0u64);
+    for e in s.request_log.iter().filter(|e| e.ts >= since) {
+        let row = by.entry(e.target.clone()).or_default();
+        row.0 += 1;
+        row.1 += e.prompt_tokens;
+        row.2 += e.completion_tokens;
+        reqs += 1;
+        pin += e.prompt_tokens;
+        pout += e.completion_tokens;
+    }
+    let mut by_target: Vec<Value> = by
+        .into_iter()
+        .map(|(t, (r, p, c))| {
+            json!({ "target": t, "requests": r, "prompt_tokens": p, "completion_tokens": c, "total_tokens": p + c })
+        })
+        .collect();
+    by_target.sort_by(|a, b| b["requests"].as_u64().cmp(&a["requests"].as_u64()));
+    Json(json!({
+        "period": period, "since": since,
+        "totals": { "requests": reqs, "prompt_tokens": pin, "completion_tokens": pout, "total_tokens": pin + pout },
+        "by_target": by_target
+    }))
+}
+
+async fn get_usage_logs(
+    State(st): St,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> Json<Value> {
+    let limit: usize = q.get("limit").and_then(|s| s.parse().ok()).unwrap_or(200);
+    let s = st.snapshot();
+    let logs: Vec<Value> = s
+        .request_log
+        .iter()
+        .rev()
+        .take(limit)
+        .map(|e| {
+            json!({
+                "ts": e.ts, "target": e.target,
+                "prompt_tokens": e.prompt_tokens, "completion_tokens": e.completion_tokens,
+                "total_tokens": e.prompt_tokens + e.completion_tokens,
+                "status": e.status, "stream": e.stream
+            })
+        })
+        .collect();
+    Json(json!({ "logs": logs }))
+}
+
 // ---- chat ----
 
 async fn chat(State(st): St, Json(req): Json<ChatRequest>) -> Response {
@@ -297,7 +372,7 @@ async fn chat(State(st): St, Json(req): Json<ChatRequest>) -> Response {
         match orch.run_stream(&req.model, &req).await {
             Ok((stream, target)) => {
                 let label = target.map(|t| t.label()).unwrap_or_else(|| req.model.clone());
-                st.record_usage(&label, 0, 0); // count the request (token totals tracked on non-stream)
+                st.record_request(&label, 0, 0, 200, true); // count the request; tokens tracked on non-stream
                 let event_stream = async_stream::stream! {
                     futures::pin_mut!(stream);
                     while let Some(item) = stream.next().await {

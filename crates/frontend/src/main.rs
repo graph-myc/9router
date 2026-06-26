@@ -5,6 +5,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use serde_json::Value;
 use std::collections::HashSet;
+use wasm_bindgen::JsValue;
 
 const API_BASE: &str = "http://localhost:20127/v1";
 
@@ -89,6 +90,7 @@ fn App() -> impl IntoView {
                 <div class="content">
                     {move || match view.get().as_str() {
                         "providers" => view! { <ProvidersView/> }.into_any(),
+                        "usage" => view! { <UsageView/> }.into_any(),
                         "models" => view! { <ModelsView models=models combos=combos/> }.into_any(),
                         "playground" => view! { <Playground models=models combos=combos/> }.into_any(),
                         _ => view! { <EndpointView version=version models=models combos=combos/> }.into_any(),
@@ -124,7 +126,10 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
                 <span class="ic">"▶"</span><span>"Playground"</span>
             </button>
             <div class="navgroup">"System"</div>
-            <button class="navitem" disabled=true><span class="ic">"📊"</span><span>"Usage"</span></button>
+            <button class="navitem" class:active=move || view.get() == "usage"
+                on:click=move |_| view.set("usage".to_string())>
+                <span class="ic">"📊"</span><span>"Usage"</span>
+            </button>
             <button class="navitem" disabled=true><span class="ic">"🔑"</span><span>"API Keys"</span></button>
             <button class="navitem" disabled=true><span class="ic">"⚙"</span><span>"Settings"</span></button>
         </aside>
@@ -135,6 +140,7 @@ fn Sidebar(view: RwSignal<String>) -> impl IntoView {
 fn Topbar(view: RwSignal<String>, version: RwSignal<String>) -> impl IntoView {
     let title = move || match view.get().as_str() {
         "providers" => "Providers",
+        "usage" => "Usage",
         "models" => "Models & Combos",
         "playground" => "Playground",
         _ => "Endpoint",
@@ -482,6 +488,132 @@ fn ProviderCard(prov: Value, reload: Callback<()>) -> impl IntoView {
 }
 
 #[component]
+fn UsageView() -> impl IntoView {
+    let period = RwSignal::new("today".to_string());
+    let tab = RwSignal::new("overview".to_string());
+    let summary: RwSignal<Option<Value>> = RwSignal::new(None);
+    let logs: RwSignal<Vec<Value>> = RwSignal::new(Vec::new());
+
+    Effect::new(move |_| {
+        let p = period.get();
+        spawn_local(async move {
+            if let Some(v) = fetch_json(&format!("/api/usage/summary?period={p}")).await {
+                summary.set(Some(v));
+            }
+        });
+    });
+    let load_logs = move || {
+        spawn_local(async move {
+            if let Some(v) = fetch_json("/api/usage/logs?limit=200").await {
+                logs.set(v["logs"].as_array().cloned().unwrap_or_default());
+            }
+        });
+    };
+    load_logs();
+
+    let periods = ["today", "24h", "7d", "30d", "60d"];
+
+    view! {
+        <div class="card">
+            <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+                <div class="row">
+                    <button class=move || if tab.get() == "overview" { "btn" } else { "btn ghost" }
+                        on:click=move |_| tab.set("overview".to_string())>"Overview"</button>
+                    <button class=move || if tab.get() == "logs" { "btn" } else { "btn ghost" }
+                        on:click=move |_| { tab.set("logs".to_string()); load_logs(); }>"Logs"</button>
+                </div>
+                {move || (tab.get() == "overview").then(|| view! {
+                    <div class="row" style="flex-wrap:wrap;gap:6px">
+                        {periods.iter().map(|&p| {
+                            let set_v = p.to_string();
+                            let cmp_v = p.to_string();
+                            let label = p.to_uppercase();
+                            view! {
+                                <button
+                                    class=move || if period.get() == cmp_v { "chip round-robin" } else { "chip" }
+                                    on:click=move |_| period.set(set_v.clone())>{label}</button>
+                            }
+                        }).collect_view()}
+                    </div>
+                })}
+            </div>
+        </div>
+        {move || if tab.get() == "overview" {
+            view! {
+                <div class="card">
+                    <h3><span>"📊"</span>"Overview"</h3>
+                    <div class="grid">
+                        <div class="modelrow"><span class="muted">"Requests"</span>
+                            <b>{move || summary.get().map(|s| s["totals"]["requests"].as_u64().unwrap_or(0)).unwrap_or(0).to_string()}</b></div>
+                        <div class="modelrow"><span class="muted">"Total tokens"</span>
+                            <b>{move || summary.get().map(|s| s["totals"]["total_tokens"].as_u64().unwrap_or(0)).unwrap_or(0).to_string()}</b></div>
+                        <div class="modelrow"><span class="muted">"Prompt / Completion"</span>
+                            <b>{move || summary.get().map(|s| format!("{} / {}",
+                                s["totals"]["prompt_tokens"].as_u64().unwrap_or(0),
+                                s["totals"]["completion_tokens"].as_u64().unwrap_or(0))).unwrap_or_default()}</b></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span>"🎯"</span>"By target"</h3>
+                    <div class="grid">
+                        {move || {
+                            let rows = summary.get().and_then(|s| s["by_target"].as_array().cloned()).unwrap_or_default();
+                            if rows.is_empty() {
+                                view! { <span class="muted">"No requests in this period yet."</span> }.into_any()
+                            } else {
+                                rows.into_iter().map(|r| view! {
+                                    <div class="modelrow">
+                                        <code style="font-size:12.5px">{r["target"].as_str().unwrap_or("").to_string()}</code>
+                                        <span class="muted">{format!("{} req · {} tok",
+                                            r["requests"].as_u64().unwrap_or(0), r["total_tokens"].as_u64().unwrap_or(0))}</span>
+                                    </div>
+                                }).collect_view().into_any()
+                            }
+                        }}
+                    </div>
+                </div>
+            }.into_any()
+        } else {
+            view! {
+                <div class="card">
+                    <div class="row" style="justify-content:space-between">
+                        <h3 style="margin:0"><span>"🧾"</span>"Request log"</h3>
+                        <button class="btn ghost" on:click=move |_| load_logs()>"Refresh"</button>
+                    </div>
+                    <div class="grid" style="margin-top:14px">
+                        {move || {
+                            let rows = logs.get();
+                            if rows.is_empty() {
+                                view! { <span class="muted">"No requests logged yet."</span> }.into_any()
+                            } else {
+                                rows.into_iter().map(|e| {
+                                    let ts = e["ts"].as_u64().unwrap_or(0);
+                                    let target = e["target"].as_str().unwrap_or("").to_string();
+                                    let tok = e["total_tokens"].as_u64().unwrap_or(0);
+                                    let status = e["status"].as_u64().unwrap_or(0);
+                                    let stream = e["stream"].as_bool().unwrap_or(false);
+                                    view! {
+                                        <div class="modelrow">
+                                            <div>
+                                                <code style="font-size:12.5px">{target}</code>
+                                                <div class="muted" style="margin-top:4px">
+                                                    {fmt_time(ts)}{if stream { "  ·  stream" } else { "" }}
+                                                </div>
+                                            </div>
+                                            <span class="muted">{format!("{tok} tok · {status}")}</span>
+                                        </div>
+                                    }
+                                }).collect_view().into_any()
+                            }
+                        }}
+                    </div>
+                </div>
+            }.into_any()
+        }}
+    }
+}
+
+#[component]
 fn Playground(models: Models, combos: Combos) -> impl IntoView {
     let model = RwSignal::new(String::new());
     let prompt = RwSignal::new(String::new());
@@ -598,4 +730,12 @@ fn fmt_test(r: Option<Value>) -> String {
         ),
         None => "\u{2717} network error".to_string(),
     }
+}
+
+/// Format an epoch-seconds timestamp as a local time string (browser locale).
+fn fmt_time(ts: u64) -> String {
+    let d = js_sys::Date::new(&JsValue::from_f64((ts as f64) * 1000.0));
+    d.to_locale_time_string("en-US")
+        .as_string()
+        .unwrap_or_default()
 }

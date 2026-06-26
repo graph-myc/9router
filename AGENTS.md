@@ -26,6 +26,7 @@ Rust Cargo workspace (`Cargo.toml`):
 - `crates/aggregator` (package `myc-core`) — routing engine. `orchestrator.rs` strategies: fallback, round-robin, fusion.
 - `crates/frontend` (package `myc-web`) — Leptos 0.7 (CSR/WASM) dashboard. Single file: `crates/frontend/src/main.rs`.
   Built with `trunk` → `crates/frontend/dist`, served at the site root (see `Trunk.toml` `public_url = "/"`).
+  **UI design system (colors, typography, components, icons) is documented in [DESIGN.md](./DESIGN.md) — follow it for all dashboard work.**
 - `legacy/` — the original Next.js app, kept only as the parity reference. **Do not add features here.**
 
 ## Ports
@@ -110,3 +111,5 @@ Core user value lands by Phase F. Phase L depends on external binaries/credentia
 - Reuse existing patterns: `OpenAiCompatibleProvider`, orchestrator strategy enum, `LogBuffer`
   broadcast → SSE, frontend `fetch_json`/`post_json`/`delete_req` helpers, the `ProviderCard` view.
 - Keep changes surgical and scoped to the current phase; one feature group per commit.
+- Dashboard UI must follow the design system in [DESIGN.md](./DESIGN.md): dark theme tokens, the routing
+  strategy color map (fallback=blue, round-robin=green, fusion=purple), inline-SVG `icon()` glyphs, and **no emoji**.

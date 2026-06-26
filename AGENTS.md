@@ -18,21 +18,21 @@ testing each ported feature against the running legacy app. **Once parity is rea
 
 Rust Cargo workspace (`Cargo.toml`):
 
-- `crates/backend` (package `myc-node`, binary `myc`) — Axum HTTP server. Serves the dashboard at `/dashboard`, OpenAI-compatible API
+- `crates/backend` (package `myc-node`, binary `myc`) — Axum HTTP server. Serves the dashboard at `/` (root), OpenAI-compatible API
   under `/v1`, management API under `/api`. Entry: `crates/backend/src/main.rs`.
   - `state.rs` — mutable app state + `state.json` persistence + orchestrator rebuild.
   - `provider_openai.rs` — OpenAI-compatible provider HTTP client (chat once/stream, model fetch, quota capture).
   - `config.rs` — `config.toml` seed config. `logbuf.rs` — tracing ring buffer → SSE.
 - `crates/aggregator` (package `myc-core`) — routing engine. `orchestrator.rs` strategies: fallback, round-robin, fusion.
 - `crates/frontend` (package `myc-web`) — Leptos 0.7 (CSR/WASM) dashboard. Single file: `crates/frontend/src/main.rs`.
-  Built with `trunk` → `crates/frontend/dist`, served under `/dashboard/` (see `Trunk.toml`).
+  Built with `trunk` → `crates/frontend/dist`, served at the site root (see `Trunk.toml` `public_url = "/"`).
 - `legacy/` — the original Next.js app, kept only as the parity reference. **Do not add features here.**
 
 ## Ports
 
 | App | Port | URL |
 |-----|------|-----|
-| **Rust migration (Mycelix)** | **20130** | http://localhost:20130/dashboard |
+| **Rust migration (Mycelix)** | **20130** | http://localhost:20130/ |
 | **Legacy (Next.js, reference)** | **20129** | http://localhost:20129 |
 
 Legacy requires login by default; password is `123456`.
@@ -74,12 +74,12 @@ For each feature being ported:
 4. **Verify** the Rust app on `:20130`:
    - Probe new endpoints, e.g.
      `Invoke-WebRequest http://localhost:20130/api/<route> -UseBasicParsing`
-   - Smoke-test the dashboard at `http://localhost:20130/dashboard`.
+   - Smoke-test the dashboard at `http://localhost:20130/` (hash routes like `/#/providers`).
    - Compare output/shape against the legacy endpoint on `:20129`.
 5. **Add tests** where logic lives in a crate (`cargo test -p aggregator`, etc.).
 6. **Commit** the feature group with a conventional message (`feat(...)`, `fix(...)`).
 
-Verification baseline (must stay green): `http://localhost:20130/dashboard` → 200,
+Verification baseline (must stay green): `http://localhost:20130/` → 200,
 `http://localhost:20130/v1/models` → 200.
 
 ## Phased plan (A → L)
@@ -104,7 +104,7 @@ Core user value lands by Phase F. Phase L depends on external binaries/credentia
 ## Conventions & gotchas
 
 - Stop `myc.exe` before any `cargo build` (Windows file lock, error 5).
-- Frontend asset URLs are prefixed `/dashboard/` via `Trunk.toml public_url`; keep it in sync with the backend mount.
+- Frontend asset URLs are root-relative via `Trunk.toml` `public_url = "/"`; the backend serves the SPA at `/` with a `fallback_service`.
 - `state.json` is gitignored (may contain provider API keys). Never commit it.
 - Chat passthrough headers use `x_myc_*` (renamed from `x_9router_*`).
 - Reuse existing patterns: `OpenAiCompatibleProvider`, orchestrator strategy enum, `LogBuffer`

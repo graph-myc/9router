@@ -11,7 +11,7 @@ use axum::{
     extract::{Path, Query, Request, State},
     http::StatusCode,
     middleware::{self, Next},
-    response::{sse::Event, IntoResponse, Redirect, Response, Sse},
+    response::{sse::Event, IntoResponse, Response, Sse},
     routing::{delete, get, post, put},
     Extension, Json, Router,
 };
@@ -72,8 +72,8 @@ async fn main() {
         .route("/quota", get(get_quota))
         .route("/settings/require-key", put(set_require_key));
 
-    // The Leptos dashboard (SPA) is served under /dashboard; unknown sub-paths
-    // fall back to index.html so client-side routing works.
+    // The Leptos dashboard (SPA) is served at the root path; unmatched paths
+    // fall back to index.html so client-side (hash) routing works.
     let dist = "crates/frontend/dist";
     let dashboard = ServeDir::new(dist)
         .not_found_service(ServeFile::new(format!("{dist}/index.html")));
@@ -81,17 +81,16 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/version", get(version))
-        .route("/", get(|| async { Redirect::permanent("/dashboard") }))
         .nest("/v1", v1)
         .nest("/api", api)
         .with_state(app_state)
-        .nest_service("/dashboard", dashboard)
+        .fallback_service(dashboard)
         .layer(Extension(log_buffer.clone()))
         .layer(CorsLayer::permissive());
 
     let addr = format!("0.0.0.0:{port}");
     tracing::info!(
-        "M Y C backend v{} on http://{addr} — dashboard at http://localhost:{port}/dashboard",
+        "Mycelix backend v{} on http://{addr} — dashboard at http://localhost:{port}/",
         env!("CARGO_PKG_VERSION")
     );
     let listener = TcpListener::bind(&addr).await.expect("bind listener");
